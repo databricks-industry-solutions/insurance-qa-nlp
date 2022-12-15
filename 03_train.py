@@ -1,5 +1,5 @@
 # Databricks notebook source
-This notebook can be found at https://github.com/databricks-industry-solutions/insurance-qa-nlp
+# MAGIC %md This notebook can be found at https://github.com/databricks-industry-solutions/insurance-qa-nlp
 
 # COMMAND ----------
 
