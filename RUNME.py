@@ -37,38 +37,74 @@ job_json = {
         "max_concurrent_runs": 1,
         "tags": {
             "usage": "solacc_testing",
-            "group": "SOLACC"
+            "group": "FSI"
         },
         "tasks": [
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"01_Introduction_And_Setup"
+                    "notebook_path": f"00_README"
                 },
-                "task_key": "sample_solacc_01"
+                "task_key": "ins_qa_00"
             },
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"02_Analysis"
+                    "notebook_path": f"01_ingest"
                 },
-                "task_key": "sample_solacc_02",
+                "task_key": "ins_qa_01",
                 "depends_on": [
                     {
-                        "task_key": "sample_solacc_01"
+                        "task_key": "ins_qa_00"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "ins_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"02_explore_and_clean"
+                },
+                "task_key": "ins_qa_02",
+                "depends_on": [
+                    {
+                        "task_key": "ins_qa_01"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "ins_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"03_train"
+                },
+                "task_key": "ins_qa_03", #
+                "depends_on": [
+                    {
+                        "task_key": "ins_qa_02"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "ins_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"04_inference"
+                },
+                "task_key": "ins_qa_04",
+                "depends_on": [
+                    {
+                        "task_key": "ins_qa_03"
                     }
                 ]
             }
         ],
         "job_clusters": [
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "job_cluster_key": "ins_qa_cluster",
                 "new_cluster": {
-                    "spark_version": "11.3.x-cpu-ml-scala2.12",
+                    "spark_version": "10.4.x-cpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
-                    "num_workers": 2,
+                    "num_workers": 1,
                     "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
                     "custom_tags": {
                         "usage": "solacc_testing"
