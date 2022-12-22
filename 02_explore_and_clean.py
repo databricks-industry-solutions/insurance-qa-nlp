@@ -32,7 +32,7 @@
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, length, median
+from pyspark.sql.functions import col, length
 
 df_summary = (
   spark.sql("select * from insuranceqa.train")

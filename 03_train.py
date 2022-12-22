@@ -25,7 +25,11 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install transformers==4.24
+# MAGIC %pip install pytorch-lightning
+
+# COMMAND ----------
+
+# MAGIC %pip install transformers==4.24 torch pytorch-lightning
 
 # COMMAND ----------
 

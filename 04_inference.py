@@ -14,4 +14,4 @@
 
 # COMMAND ----------
 
-# TODO
+# MAGIC %pip install transformers==4.24 torch==1.13.0 pytorch-lightning==1.8.3.post1
