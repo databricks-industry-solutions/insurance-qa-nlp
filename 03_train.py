@@ -279,7 +279,7 @@ from pytorch_lightning.loggers import MLFlowLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 # Explicitly setting the experiment here to the user's own folder: this is needed for the notebook to run in jobs
-dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
 mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
 
 early_stop_callback = EarlyStopping(
