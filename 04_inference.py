@@ -81,7 +81,7 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 spark.conf.set("spark.sql.adaptive.enabled", False)
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", 50)
+spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", 10000)
 
 valid_df = spark.sql("select question_en from insuranceqa.valid")
 valid_df = valid_df.persist(StorageLevel.MEMORY_ONLY)
@@ -98,3 +98,7 @@ valid_df = valid_df.groupBy(F.spark_partition_id().alias("_pid")).applyInPandas(
 # COMMAND ----------
 
 valid_df.write.saveAsTable("insuranceqa.valid_pred", mode = "overwrite", mergeSchema = True)
+
+# COMMAND ----------
+
+
