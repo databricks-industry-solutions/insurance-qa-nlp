@@ -14,6 +14,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install --upgrade pip && pip install -q transformers==4.24 torch pytorch-lightning
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Distilbert Example
@@ -25,29 +29,33 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pytorch-lightning
-
-# COMMAND ----------
-
-# MAGIC %pip install transformers==4.24 torch pytorch-lightning
-
-# COMMAND ----------
-
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased")
 
-inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+sentiments = {
+  "LABEL_0": "Positive",
+  "LABEL_1": "Negative"
+}
+
+sentence = "I'm happy today!"
+inputs = tokenizer(sentence, return_tensors="pt")
 with torch.no_grad():
   outputs = model(**inputs, labels = torch.tensor(0))
   logits = outputs.logits
   loss = outputs.loss
 
 predicted_class_id = logits.argmax().item()
-model.config.id2label[predicted_class_id]
-print(loss)
+label = model.config.id2label[predicted_class_id]
+sentiment = sentiments[label]
+
+print("\n****************************************************************************************")
+print(f"Sentiment for the sentence: '{sentence}' was classified as {label} / {sentiment}")
+print("****************************************************************************************")
+
+outputs
 
 # COMMAND ----------
 
@@ -70,6 +78,8 @@ from torch.utils.data import Dataset, DataLoader
 from pyspark.storagelevel import StorageLevel
 from sklearn.preprocessing import LabelEncoder
 from transformers import AutoTokenizer
+import itertools
+import collections
 
 class InsuranceDataset(Dataset):
     def __init__(
@@ -85,13 +95,15 @@ class InsuranceDataset(Dataset):
       super().__init__()
       self.input_col = input_col
       self.label_col = label_col
+      self.split = split
       self.df = spark.sql(
-        f"select * from {database_name}.{split}"
+        f"select * from {database_name}.{self.split}"
       ).toPandas()
       self.length = len(self.df)
       self.class_mappings = self._get_class_mappings()
       self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
       self.max_length = max_length
+      self.weights = None
 
     def _get_class_mappings(self):
       labels = self.df \
@@ -101,6 +113,20 @@ class InsuranceDataset(Dataset):
       indexes = LabelEncoder().fit_transform(labels)
       class_mappings = dict(zip(labels, indexes))
       return class_mappings
+
+    def _get_class_weights(self):
+
+      # Calculating class_weights
+      if self.split == "train":
+        weights_df = self.df.groupby("topic_en").count().reset_index()
+        weights_df["weight"] = 1 / weights_df["id"]
+        self.weights = torch.tensor(weights_df["weight"].values)
+
+      class_mappings = training_data.class_mappings
+      weights = [(class_mappings[row[1]], row[0]) for row in list(itertools.chain(spark.sql(query).toLocalIterator()))]
+      weights_dict = collections.OrderedDict(sorted(dict(weights).items()))
+      weights_tensor = torch.tensor([weight[1] for weight in weights_dict.items()])
+      self.weights = weights_tensor
 
     def _encode_label(self, label):
       self._get_class_mappings()
@@ -145,7 +171,7 @@ class InsuranceDataset(Dataset):
 # COMMAND ----------
 
 training_data = InsuranceDataset(split = "train")
-training_data[100]
+training_data[0]
 
 # COMMAND ----------
 
@@ -164,8 +190,8 @@ training_data[100]
 from torch.utils.data import DataLoader
 
 test_data = InsuranceDataset(split = "test")
-train_dataloader = DataLoader(training_data, batch_size=32, shuffle=True, num_workers=20)
-test_dataloader = DataLoader(test_data, batch_size=16, shuffle=False, num_workers=20)
+train_dataloader = DataLoader(training_data, batch_size=32, shuffle=True, num_workers=4)
+test_dataloader = DataLoader(test_data, batch_size=8, shuffle=False, num_workers=4)
 
 # COMMAND ----------
 
@@ -184,17 +210,19 @@ test_dataloader = DataLoader(test_data, batch_size=16, shuffle=False, num_worker
 import pytorch_lightning as pl
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AdamW, AutoConfig, AutoModelForSequenceClassification
+from transformers import AutoConfig, AutoModelForSequenceClassification
 from typing import Optional
 import numpy as np
 from pytorch_lightning.utilities import rank_zero_only
+from torch.optim import AdamW
 
 class LitModel(pl.LightningModule):
     def __init__(
       self,
+        loss,
         model_name_or_path: str = "distilbert-base-uncased",
         num_labels: int = 12,
-        learning_rate: float = 1e-5,
+        learning_rate: float = 1e-4,
         adam_epsilon: float = 1e-8,
         warmup_steps: int = 0,
         weight_decay: float = 1e-10,
@@ -203,7 +231,8 @@ class LitModel(pl.LightningModule):
         **kwargs,
     ):
       super().__init__()
-      self.save_hyperparameters()
+      self.save_hyperparameters(ignore=["loss"])
+      self.learning_rate = learning_rate
       self.config = AutoConfig.from_pretrained(
         model_name_or_path,
         num_labels = num_labels,
@@ -218,6 +247,8 @@ class LitModel(pl.LightningModule):
         for name, param in self.l1.named_parameters():
           if "distilbert" in name:
               param.requires_grad = False
+
+      self.loss = nn.CrossEntropyLoss()
 
     def forward(self, **inputs):
       output_l1 = self.l1(**inputs)
@@ -234,8 +265,9 @@ class LitModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
-      self.log("loss", outputs.loss)
-      return {"loss": outputs.loss}
+      loss = self.loss(outputs.logits, batch["labels"])
+      self.log("loss", loss)
+      return {"loss": loss}
 
     def training_epoch_end(self, outputs):
       all_preds = [output["loss"].cpu().numpy() for output in outputs]
@@ -243,8 +275,9 @@ class LitModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx = 0):
       outputs = self(**batch)
-      metric = {"val_loss": outputs.loss}
-      self.log("val_loss", outputs.loss)
+      loss = self.loss(outputs.logits, batch["labels"])
+      metric = {"val_loss": loss}
+      self.log("val_loss", loss)
       return metric
 
     def validation_epoch_end(self, outputs):
@@ -257,7 +290,7 @@ class LitModel(pl.LightningModule):
       return y_hat
 
     def configure_optimizers(self):
-      return AdamW(self.parameters(), lr=1e-5)
+      return AdamW(self.parameters(), lr = self.learning_rate)
 
 # COMMAND ----------
 
@@ -268,8 +301,8 @@ class LitModel(pl.LightningModule):
 # MAGIC Here we will:
 # MAGIC 
 # MAGIC * Declare an `EarlyStoppingCallback` - this way we can avoid overfitting and don't need to think about number of training epochs
-# MAGIC * Declare an `MLFlowLogger` - since MLFlow `autologging` doesn't work for PyTorch Lightning > 1.5
-# MAGIC * Create a `Trainer` to train our model
+# MAGIC * Declare an `MLFlowLogger` - this will be used to track our experiment parameters and metrics into MLflow. This is needed, since MLFlow `autologging` support is still being added for PyTorch Lightning > 1.5
+# MAGIC * Create a `PyTorch Lightning Trainer` to train our model
 # MAGIC * Train our model!
 
 # COMMAND ----------
@@ -277,6 +310,8 @@ class LitModel(pl.LightningModule):
 import mlflow
 from pytorch_lightning.loggers import MLFlowLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
+mlflow.autolog(disable = True)
 
 # Explicitly setting the experiment here to the user's own folder: this is needed for the notebook to run in jobs
 username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
@@ -290,8 +325,10 @@ early_stop_callback = EarlyStopping(
   mode="min"
 )
 
-with mlflow.start_run(run_name = "torch") as run:
-  lit_model = LitModel()
+with mlflow.start_run(run_name = "distilbert") as run:
+
+  loss = nn.CrossEntropyLoss(weight = training_data.weights)
+  lit_model = LitModel(loss = loss)
   run_id = run.info.run_id
   experiment_name = mlflow.get_experiment(run.info.experiment_id)
 
@@ -302,10 +339,11 @@ with mlflow.start_run(run_name = "torch") as run:
   )
 
   trainer = pl.Trainer(
-    max_epochs = 10000,
+    max_epochs = 10, #Testing purposes; increase this for better accuracy
+    default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
     accelerator="gpu",
-    devices = 4,
+    devices = 1,
     callbacks = [early_stop_callback]
   )
 
@@ -317,7 +355,19 @@ with mlflow.start_run(run_name = "torch") as run:
 
 # COMMAND ----------
 
-def predict(question = "how do i get car insurance?", ground_truth = "auto-insurance"):
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Testing our model
+# MAGIC 
+# MAGIC Let's run inference with the model we just trained and see the results we get.
+
+# COMMAND ----------
+
+def predict(question = "how do i get car insurance?", ground_truth = "auto-insurance") -> str:
+  """Get the specific intent from a question related to Insurance.
+    question: str - The question to be asked, e.g. 'how do I get car insurance?'
+    ground_truth: str - Intent that is expected for that question, e.g. 'auto-insurance'
+  """
 
   encodings = tokenizer(
     question,
@@ -342,7 +392,6 @@ def predict(question = "how do i get car insurance?", ground_truth = "auto-insur
 
 # COMMAND ----------
 
-# DBTITLE 1,Testing our model
 for i in range(0, 10):
   sample = test_data.df.sample(1)
   question = sample["question_en"].values[0]
@@ -356,44 +405,13 @@ for i in range(0, 10):
 # COMMAND ----------
 
 # DBTITLE 1,Logging our Artifact and Registering our Model
-with mlflow.start_run(run_id = run.info.run_id) as run:
+import pickle
+
+with mlflow.start_run() as run:
 
   mlflow.pytorch.log_model(
-    lit_model,
+    pytorch_model = lit_model,
+    pickle_module = pickle,
     artifact_path = "model",
     registered_model_name = "distilbert_en_uncased_insuranceqa"
   )
-
-# COMMAND ----------
-
-class_mappings = {}
-
-for key in training_data.class_mappings.keys():
-  class_mappings[key] = training_data.class_mappings[key]
-
-class_mappings
-
-# COMMAND ----------
-
-# DBTITLE 1,A bit of free form testing with (completely) unseen data
-test_questions = {
-  "my car broke, what should I do?": 1,
-  "my mother is sick, what should I do?": 4,
-  "can I talk about my pension?": 11,
-  "I've been deemed incapacitated for work, how do I make a claim?": 3,
-  "my wife wants to know what's in our life policy": 6,
-  "can I ask a question on medicare?": 8,
-  "what's the coverage for medicare?": 8,
-  "which retirement plans you have?": 11,
-  "how you invest money for retirement plan?": 11,
-  "I'm 60, what's my health premium?": 4
-}
-
-for question, topic in test_questions.items():
-
-  pred = predict(question, topic)
-  print(f"Question: {question}")
-  print(f"Prediction: {pred}")
-  print(f"Predicted '{topic}'? {pred == topic}")
-  print(f"------------------------------------------------------------------")
-

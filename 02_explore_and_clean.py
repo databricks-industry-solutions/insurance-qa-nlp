@@ -14,12 +14,23 @@
 
 # COMMAND ----------
 
+!pip install -q wordcloud
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC ### Looking at the amount of intents
 
 # COMMAND ----------
 
+# MAGIC %sql
+# MAGIC 
+# MAGIC select distinct(topic_en) from insuranceqa.train
+
+# COMMAND ----------
+
+# DBTITLE 1,Distribution of Intents
 # MAGIC %sql
 # MAGIC 
 # MAGIC select * from insuranceqa.train
@@ -48,9 +59,10 @@ display(df_summary)
 # DBTITLE 1,Initial Insights
 # MAGIC %md
 # MAGIC 
-# MAGIC * There's a really long tail in terms of questions lengths
-# MAGIC * As a rule of thumb, questions that are this long are usually not that useful / insightful; we'll consider these as anomalies and drop them
-# MAGIC * This will be useful when it comes to tokenizing these inputs, as we'll save some valuable GPU memory that would otherwise be wasted with zeros due to padding (truncating these samples could make the model confused)
+# MAGIC * Question intents are unevenly distributed; most questions are about **life insurance**, while very few of them relate to **critical illness insurance**
+# MAGIC * There's a really **long tail** in terms of questions lengths; the majority of questions has **42 characters or less** - while a minority of them has **50 characters or more**, with max length reaching **277 characters**
+# MAGIC * As a rule of thumb, questions that are this long are usually not that **useful / insightful**; we'll consider these as anomalies and drop them from our training set
+# MAGIC * This will be useful when it comes to **encoding / tokenizing** these inputs. We'll save some valuable **GPU memory** that would otherwise be wasted with zeros due to padding - while truncating these samples could make the model confused
 
 # COMMAND ----------
 
@@ -66,12 +78,74 @@ def remove_outliers(df):
 
 # COMMAND ----------
 
-for table in ["insuranceqa.train", "insuranceqa.test", "insuranceqa.valid"]:
-
-  df = spark.sql(f"select * from {table}")
-  df = remove_outliers(df)
-  df.write.saveAsTable(name = table, mode = "overwrite")
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Looking at the most common terms
 
 # COMMAND ----------
 
+import pandas as pd
+from pyspark.sql import functions as F
+from pyspark.sql.functions import pandas_udf, PandasUDFType 
 
+@pandas_udf("string")
+def lemmatize(txt: pd.Series) -> pd.Series:
+
+  import nltk
+  from nltk.corpus import stopwords
+  from nltk.stem import WordNetLemmatizer
+  from nltk.tokenize import RegexpTokenizer
+
+  nltk.download('wordnet')
+  nltk.download('omw-1.4')
+  nltk.download('stopwords')
+  nltk.download('punkt')
+
+  lemmatizer = WordNetLemmatizer()
+  lemmas_list = []
+
+  for item in txt:
+
+    #Tokenize
+    tokenizer = RegexpTokenizer(r'\w+')
+    tokens = tokenizer.tokenize(item)
+
+    #Remove stopwords
+    tokens = [token for token in tokens if token not in stopwords.words('english')]
+
+    #Lemmatize
+    lemmas = [lemmatizer.lemmatize(token) for token in tokens]
+    lemmas_list.append(' '.join(lemmas))
+
+  return pd.Series(lemmas_list)
+  
+df.repartition(20)
+df.count()
+
+df_lemmas = df.withColumn("lemmas", lemmatize("question_en"))
+display(df_lemmas)
+
+# COMMAND ----------
+
+# DBTITLE 1,Visualizing most common terms with a Wordcloud
+from wordcloud import WordCloud
+from matplotlib import pyplot as plt
+%config InlineBackend.figure_format='retina'
+
+list_lemmas = list(itertools.chain.from_iterable(df_lemmas.select('lemmas').toLocalIterator()))
+list_lemmas = sum([lemma.split(" ") for lemma in list_lemmas], [])
+text = " ".join(list_lemmas)
+
+# lower max_font_size
+wordcloud = WordCloud(width = 1600, height = 800).generate(text)
+plt.figure(figsize=(20,12))
+plt.imshow(wordcloud)
+plt.axis("off")
+plt.show()
+
+# COMMAND ----------
+
+# DBTITLE 1,Removing Outliers
+df = spark.sql(f"select * from insuranceqa.train")
+df = remove_outliers(df)
+df.write.saveAsTable(name = table, mode = "overwrite")

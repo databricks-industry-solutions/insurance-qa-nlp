@@ -14,15 +14,15 @@
 
 # COMMAND ----------
 
-!rm -rf /dbfs/tmp/word2vec-get-started
+!rm -rf /dbfs/tmp/word2vec-get-started && rm -rf /tmp/word2vec-get-started/
 %cd /tmp
-!git clone https://github.com/hailiang-wang/word2vec-get-started.git
+!git clone https://github.com/rafaelvp-db/word2vec-get-started
 !mv /tmp/word2vec-get-started/corpus /dbfs/tmp/word2vec-get-started
 
 # COMMAND ----------
 
 dbfs_path = "/dbfs/tmp/word2vec-get-started/insuranceqa/questions"
-!ls -all {dbfs_path}
+!ls {dbfs_path}/*.txt
 
 # COMMAND ----------
 
