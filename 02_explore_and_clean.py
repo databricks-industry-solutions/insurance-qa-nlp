@@ -43,12 +43,14 @@
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, length
+from pyspark.sql import functions as F
+
+df = spark.sql("select * from insuranceqa.train")
 
 df_summary = (
-  spark.sql("select * from insuranceqa.train")
-    .withColumn("length", length(col("question_en")))
-    .select("length")
+  df
+    .withColumn("sentence_len", F.length(F.col("question_en")))
+    .select("sentence_len")
     .summary()
 )
 
@@ -70,9 +72,9 @@ def remove_outliers(df):
 
   df = (
     df
-      .withColumn("length", length(col("question_en")))
-      .filter("length < 50") # Limit size to approx. 75th quantile
-      .drop("length")
+      .withColumn("sentence_len", F.length(F.col("question_en")))
+      .filter("sentence_len < 50") # Limit size to approx. 75th quantile
+      .drop("sentence_len")
   )
   return df
 
@@ -130,6 +132,8 @@ display(df_lemmas)
 # DBTITLE 1,Visualizing most common terms with a Wordcloud
 from wordcloud import WordCloud
 from matplotlib import pyplot as plt
+import itertools
+
 %config InlineBackend.figure_format='retina'
 
 list_lemmas = list(itertools.chain.from_iterable(df_lemmas.select('lemmas').toLocalIterator()))
@@ -146,6 +150,5 @@ plt.show()
 # COMMAND ----------
 
 # DBTITLE 1,Removing Outliers
-df = spark.sql(f"select * from insuranceqa.train")
-df = remove_outliers(df)
-df.write.saveAsTable(name = table, mode = "overwrite")
+df_lemmas = remove_outliers(df_lemmas)
+df_lemmas.write.saveAsTable(name = "insuranceqa.train", mode = "overwrite", mergeSchema = True)

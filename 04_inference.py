@@ -19,13 +19,24 @@ display(valid_df)
 
 # COMMAND ----------
 
+import mlflow
+from mlflow.client import MlflowClient
+
+client = MlflowClient()
+username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+experiment = mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
+runs = client.search_runs(experiment_ids = [experiment.experiment_id], filter_string = "status = 'FINISHED' and metrics.val_loss < 0.5", order_by=["start_time"], output_format = "pandas")
+runs
+
+# COMMAND ----------
+
 from insuranceqa.datasets.insuranceqa import InsuranceDataset
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 from insuranceqa.models.distilbert_insuranceqa import LitModel
 import pandas as pd
 from pyspark.sql.functions import pandas_udf, PandasUDFType
 import torch
-import mlflow
+
 from pyspark.sql.functions import struct, col
 
 logged_model = 'runs:/a78e2612f80f47d0a70be0c4a86b09b1/model'
