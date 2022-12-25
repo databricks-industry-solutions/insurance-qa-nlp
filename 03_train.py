@@ -14,10 +14,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade pip && pip install -q transformers==4.24 torch pytorch-lightning
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Distilbert Example
@@ -90,7 +86,7 @@ class InsuranceDataset(Dataset):
       label_col = "topic_en",
       storage_level = StorageLevel.MEMORY_ONLY,
       tokenizer = "distilbert-base-uncased",
-      max_length = 512
+      max_length = 64
     ):
       super().__init__()
       self.input_col = input_col
@@ -190,8 +186,8 @@ training_data[0]
 from torch.utils.data import DataLoader
 
 test_data = InsuranceDataset(split = "test")
-train_dataloader = DataLoader(training_data, batch_size=32, shuffle=True, num_workers=4)
-test_dataloader = DataLoader(test_data, batch_size=8, shuffle=False, num_workers=4)
+train_dataloader = DataLoader(training_data, batch_size=128, shuffle=True, num_workers=4)
+test_dataloader = DataLoader(test_data, batch_size=16, shuffle=False, num_workers=4)
 
 # COMMAND ----------
 
@@ -238,21 +234,21 @@ class LitModel(pl.LightningModule):
         num_labels = num_labels,
         problem_type = "multi_label_classification"
       )
-      self.l1 = AutoModelForSequenceClassification.from_pretrained(
+      self.model = AutoModelForSequenceClassification.from_pretrained(
         model_name_or_path,
         config = self.config
       )
 
       if freeze_layers:
-        for name, param in self.l1.named_parameters():
+        for name, param in self.model.named_parameters():
           if "distilbert" in name:
               param.requires_grad = False
 
       self.loss = nn.CrossEntropyLoss()
 
     def forward(self, **inputs):
-      output_l1 = self.l1(**inputs)
-      return output_l1
+      output = self.model(**inputs)
+      return output
 
     @rank_zero_only
     def _log_metrics(self, key, values):
@@ -338,14 +334,18 @@ with mlflow.start_run(run_name = "distilbert") as run:
       tracking_uri="databricks"
   )
 
+  accelerator = "gpu" if torch.cuda.is_available() else "cpu"
+
   trainer = pl.Trainer(
-    max_epochs = 10, #Testing purposes; increase this for better accuracy
+    max_epochs = 100, # Testing purposes; increase this for better accuracy
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
-    accelerator="gpu",
+    accelerator=accelerator,
     devices = 1,
     callbacks = [early_stop_callback]
   )
+
+# Make sure to run this on a GPU cluster, otherwise it will take longer to train
 
   trainer.fit(
     lit_model,
@@ -407,11 +407,29 @@ for i in range(0, 10):
 # DBTITLE 1,Logging our Artifact and Registering our Model
 import pickle
 
-with mlflow.start_run() as run:
+experiment = mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
+runs_df = mlflow.search_runs(
+  experiment_ids = [experiment.experiment_id],
+  order_by = ["metrics.val_loss"],
+  filter_string = "status = 'FINISHED'",
+  output_format = "pandas"
+)
+
+target_run_id = runs_df.loc[0,"run_id"]
+print(target_run_id)
+runs_df
+
+# COMMAND ----------
+
+with mlflow.start_run(run_id = target_run_id, nested = True) as run:
 
   mlflow.pytorch.log_model(
     pytorch_model = lit_model,
     pickle_module = pickle,
     artifact_path = "model",
+    pip_requirements = [
+      "pytorch_lightning==1.8.6",
+      "transformers==4.23.1"
+    ],
     registered_model_name = "distilbert_en_uncased_insuranceqa"
   )

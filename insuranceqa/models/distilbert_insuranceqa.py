@@ -29,21 +29,21 @@ class LitModel(pl.LightningModule):
         num_labels = num_labels,
         problem_type = "multi_label_classification"
       )
-      self.l1 = AutoModelForSequenceClassification.from_pretrained(
+      self.model = AutoModelForSequenceClassification.from_pretrained(
         model_name_or_path,
         config = self.config
       )
 
       if freeze_layers:
-        for name, param in self.l1.named_parameters():
+        for name, param in self.model.named_parameters():
           if "distilbert" in name:
               param.requires_grad = False
 
       self.loss = nn.CrossEntropyLoss()
 
     def forward(self, **inputs):
-      output_l1 = self.l1(**inputs)
-      return output_l1
+      output = self.model(**inputs)
+      return output
 
     @rank_zero_only
     def _log_metrics(self, key, values):

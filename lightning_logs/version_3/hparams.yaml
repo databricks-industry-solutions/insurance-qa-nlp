@@ -1,0 +1,8 @@
+adam_epsilon: 1.0e-08
+eval_splits: null
+freeze_layers: true
+learning_rate: 0.0001
+model_name_or_path: distilbert-base-uncased
+num_labels: 12
+warmup_steps: 0
+weight_decay: 1.0e-10

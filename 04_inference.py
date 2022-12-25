@@ -14,19 +14,21 @@
 
 # COMMAND ----------
 
-valid_df = spark.sql("select * from insuranceqa.valid")
-display(valid_df)
-
-# COMMAND ----------
-
 import mlflow
-from mlflow.client import MlflowClient
 
-client = MlflowClient()
 username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
 experiment = mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
-runs = client.search_runs(experiment_ids = [experiment.experiment_id], filter_string = "status = 'FINISHED' and metrics.val_loss < 0.5", order_by=["start_time"], output_format = "pandas")
-runs
+runs_df = mlflow.search_runs(
+  experiment_ids = [experiment.experiment_id],
+  order_by = ["start_time DESC", "metrics.val_loss"],
+  filter_string = "status = 'FINISHED'",
+  output_format = "pandas"
+)
+
+target_run_id = runs_df.loc[0, "run_id"]
+val_loss = runs_df.loc[0, "metrics.val_loss"]
+print(f"Run ID '{target_run_id}' has the best val_loss metric ({val_loss}); selecting it for inference")
+runs_df.head()
 
 # COMMAND ----------
 
@@ -39,44 +41,43 @@ import torch
 
 from pyspark.sql.functions import struct, col
 
-logged_model = 'runs:/a78e2612f80f47d0a70be0c4a86b09b1/model'
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 mlflow.artifacts.download_artifacts(
-  run_id = "a78e2612f80f47d0a70be0c4a86b09b1",
+  run_id = target_run_id,
   artifact_path = "model/data",
   dst_path = "/dbfs/tmp/"
 )
-loaded_model = torch.load("/dbfs/tmp/model/data/model.pth", map_location = torch.device("cpu"))
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+loaded_model = torch.load(
+  "/dbfs/tmp/model/data/model.pth",
+  map_location = torch.device(device)
+)
+
 loaded_model = sc.broadcast(loaded_model)
 tokenizer = sc.broadcast(tokenizer)
 
 # COMMAND ----------
 
+from torch.utils.data import DataLoader
+import pytorch_lightning as pl
+
 def predict(pdf):
   
   label_list = []
-  for question in pdf.question_en.values:
-    encodings = tokenizer.value(
-      question,
-      None,
-      add_special_tokens=True,
-      return_token_type_ids=True,
-      truncation=True,
-      max_length=512,
-      padding="max_length"
-    )
+  dataset = InsuranceDataset(questions = pdf.question_en.values)
+  dataloader = DataLoader(dataset, batch_size = 256, shuffle = False, num_workers = 4)
+  trainer = pl.Trainer(accelerator = "gpu" if torch.cuda.is_available() else "cpu")
+  pred = trainer.predict(loaded_model.value, dataloader)
 
-    inputs = {
-      "input_ids": torch.tensor([encodings["input_ids"]], dtype = torch.long),
-      "attention_mask": torch.tensor([encodings["attention_mask"]], dtype = torch.long)
-    }
+  pred_list = []
+  for item in pred:
+    for logit in item.logits:
+      pred_list.append(logit.argmax().item())
 
-    with torch.no_grad():
-      y_hat = loaded_model.value(**inputs)
-      label = y_hat.logits.argmax().item()
-      label_list.append(label)
+  pdf["pred"] = pred_list
 
-  pdf["pred"] = label_list
   return pdf
 
 # COMMAND ----------
@@ -89,27 +90,30 @@ predict(test_df)
 from pyspark.sql import functions as F
 from pyspark import StorageLevel
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from insuranceqa.datasets.insuranceqa import InsuranceDataset
+from torch.utils.data import DataLoader
+import pytorch_lightning as pl
 
 spark.conf.set("spark.sql.adaptive.enabled", False)
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", 10000)
 
-valid_df = spark.sql("select question_en from insuranceqa.valid")
+valid_df = spark.sql("select id, question_en, topic_en from insuranceqa.valid")
 valid_df = valid_df.persist(StorageLevel.MEMORY_ONLY)
-valid_df.count()
-valid_df = valid_df.repartition(32)
 valid_df.count()
 
 predict_udf = pandas_udf(predict, returnType = IntegerType())
-valid_df = valid_df.groupBy(F.spark_partition_id().alias("_pid")).applyInPandas(
-  predict,
-  schema = "question_en string, pred int"
-)
+
+valid_df = valid_df.groupBy(
+    F.spark_partition_id().alias("_pid")
+  ).applyInPandas(
+    predict,
+    schema = "id string, question_en string, topic_en string, pred int"
+  )
+
+# COMMAND ----------
+
+display(valid_df)
 
 # COMMAND ----------
 
 valid_df.write.saveAsTable("insuranceqa.valid_pred", mode = "overwrite", mergeSchema = True)
-
-# COMMAND ----------
-
-

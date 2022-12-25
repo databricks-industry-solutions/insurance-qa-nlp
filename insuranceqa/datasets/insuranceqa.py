@@ -5,12 +5,15 @@ from sklearn.preprocessing import LabelEncoder
 from transformers import AutoTokenizer
 import itertools
 import collections
+from typing import List
+import pandas as pd
 
 class InsuranceDataset(Dataset):
     def __init__(
       self,
       database_name = "insuranceqa",
-      split = "train",
+      split = None,
+      questions: List[str] = [],
       input_col = "question_en",
       label_col = "topic_en",
       storage_level = StorageLevel.MEMORY_ONLY,
@@ -21,11 +24,19 @@ class InsuranceDataset(Dataset):
       self.input_col = input_col
       self.label_col = label_col
       self.split = split
-      self.df = spark.sql(
-        f"select * from {database_name}.{self.split}"
-      ).toPandas()
+      
+      if split is not None:
+        self.df = spark.sql(
+          f"select * from {database_name}.{self.split}"
+        ).toPandas()
+        if split == "train":
+          self.class_mappings = self._get_class_mappings()
+      elif len(questions) > 0:
+        self.df = pd.DataFrame(questions, columns = ["question_en"])
+      else:
+        raise ValueError("You need to pass either split or questions")
+        
       self.length = len(self.df)
-      self.class_mappings = self._get_class_mappings()
       self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
       self.max_length = max_length
       self.weights = None
@@ -54,7 +65,6 @@ class InsuranceDataset(Dataset):
       self.weights = weights_tensor
 
     def _encode_label(self, label):
-      self._get_class_mappings()
       label_class = self.class_mappings[label]
       encoded_label = torch.nn.functional.one_hot(
         torch.tensor([label_class]),
@@ -79,10 +89,14 @@ class InsuranceDataset(Dataset):
 
       ids = inputs['input_ids']
       mask = inputs['attention_mask']
-      labels = self.df.loc[idx, self.label_col]
-      labels = self._encode_label(labels)[0]
-      return {
+      output = {
         "input_ids": torch.tensor(ids, dtype = torch.long),
-        "attention_mask": torch.tensor(mask, dtype = torch.long),
-        "labels": labels
+        "attention_mask": torch.tensor(mask, dtype = torch.long)
       }
+      
+      if self.split == "train":
+        labels = self.df.loc[idx, self.label_col]
+        labels = self._encode_label(labels)[0]
+        output["labels"] = labels
+        
+      return output
