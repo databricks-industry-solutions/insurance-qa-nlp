@@ -73,6 +73,18 @@ job_json = {
             },
             {
                 "job_cluster_key": "ins_qa_cluster",
+                "libraries": [
+                    {
+                        "pypi": {
+                            "package": "pytorch_lightning==1.8.6"
+                        }
+                    },
+                    {
+                        "pypi": {
+                            "package": "transformers"
+                        }
+                    }
+                ],
                 "notebook_task": {
                     "notebook_path": f"03_train"
                 },
