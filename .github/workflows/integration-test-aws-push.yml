@@ -27,7 +27,8 @@ jobs:
              "node_type_id": "p3.2xlarge",
              "aws_attributes": {
                "availability": "ON_DEMAND",
-               "ebs_volume_count": 1
+               "ebs_volume_count": 1,
+               "ebs_volume_size": 32
              },
              "spark_conf": {
                   "spark.master": "local[*, 4]",
