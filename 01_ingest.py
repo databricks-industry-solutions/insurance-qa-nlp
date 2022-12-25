@@ -26,14 +26,20 @@ dbfs_path = "/dbfs/tmp/word2vec-get-started/insuranceqa/questions"
 
 # COMMAND ----------
 
-from pyspark.sql.functions import lower, regexp_replace, col
+from pyspark.sql.functions import (
+  lower,
+  regexp_replace,
+  col,
+  monotonically_increasing_id
+)
 
 def ingest_data(
   path,
-  output_table
+  output_table,
+  database = "insuranceqa"
 ):
 
-  spark.sql("create database if not exists insuranceqa")
+  spark.sql(f"create database if not exists {database}")
   spark.sql(f"drop table if exists {output_table}")
 
   df = spark.read.csv(
@@ -42,6 +48,7 @@ def ingest_data(
     header = True
   )
 
+  # Read CSV Q&A data into dataframe
   df = df.toDF(
     'id',
     'topic_en',
@@ -55,32 +62,38 @@ def ingest_data(
 
 def clean(df):
 
-  df = df.withColumn("question_en", regexp_replace(lower(col("question_en")), "  ", " "))
+  df = df.withColumn(
+    "question_en",
+    regexp_replace(lower(col("question_en")), "  ", " ")
+  )
   return df
 
-def pipeline(path, output_table):
+def pipeline(path, output_table, database = "insuranceqa"):
   df = ingest_data(path, output_table)
   df = clean(df)
+  df_intents = (
+    df
+      .select("topic_en")
+      .distinct()
+      .orderBy("topic_en")
+      .withColumn("topic_id", monotonically_increasing_id())
+  )
+  df_intents.write.saveAsTable(
+    f"{database}.intent",
+    mode = "overwrite",
+    mergeSchema = True
+  )
   df.write.saveAsTable(output_table)
 
-pipeline(f"{dbfs_path.replace('/dbfs', '')}/train.questions.txt", "insuranceqa.train")
-pipeline(f"{dbfs_path.replace('/dbfs', '')}/test.questions.txt", "insuranceqa.test")
-pipeline(f"{dbfs_path.replace('/dbfs', '')}/valid.questions.txt", "insuranceqa.valid")
+splits = ["train", "test", "valid"]
+for split in splits:
+  pipeline(
+    f"{dbfs_path.replace('/dbfs', '')}/{split}.questions.txt",
+    f"insuranceqa.{split}"
+  )
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC 
-# MAGIC select * from insuranceqa.train limit 10
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC 
-# MAGIC select * from insuranceqa.test limit 10
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC 
-# MAGIC select * from insuranceqa.valid limit 10
+for table in ["train", "test", "valid", "intent"]:
+  count = spark.sql(f"select count(1) from insuranceqa.{table}").take(1)
+  print(f"Table '{table}' has {count} rows")

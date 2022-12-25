@@ -116,4 +116,24 @@ display(valid_df)
 
 # COMMAND ----------
 
-valid_df.write.saveAsTable("insuranceqa.valid_pred", mode = "overwrite", mergeSchema = True)
+intent_df = spark.sql("select topic_id, topic_en as intent from insuranceqa.intent") \
+  .withColumn("topic_id", F.col("topic_id").cast("int"))
+
+(
+  valid_df
+    .join(intent_df, intent_df.topic_id == valid_df.pred)
+    .write
+    .saveAsTable(
+      "insuranceqa.valid_pred",
+      mode = "overwrite",
+      mergeSchema = True
+    )
+)
+
+# COMMAND ----------
+
+display(valid_df)
+
+# COMMAND ----------
+
+
