@@ -337,7 +337,7 @@ with mlflow.start_run(run_name = "distilbert") as run:
   accelerator = "gpu" if torch.cuda.is_available() else "cpu"
 
   trainer = pl.Trainer(
-    max_epochs = 100, # Testing purposes; increase this for better accuracy
+    max_steps = 10, # Testing purposes; increase this for better accuracy
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
     accelerator=accelerator,

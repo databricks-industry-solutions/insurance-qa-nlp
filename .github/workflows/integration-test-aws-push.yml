@@ -24,11 +24,9 @@ jobs:
            {
              "num_workers": 0,
              "spark_version": "11.3.x-scala2.12",
-             "node_type_id": "p3.2xlarge",
+             "node_type_id": "i3.xlarge",
              "aws_attributes": {
-               "availability": "ON_DEMAND",
-               "ebs_volume_count": 1,
-               "ebs_volume_size": 32
+               "availability": "ON_DEMAND"
              },
              "spark_conf": {
                   "spark.master": "local[*, 4]",
