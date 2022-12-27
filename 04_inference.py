@@ -14,32 +14,21 @@
 
 # COMMAND ----------
 
-import mlflow
-
-username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
-experiment = mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
-runs_df = mlflow.search_runs(
-  experiment_ids = [experiment.experiment_id],
-  order_by = ["start_time DESC", "metrics.val_loss"],
-  filter_string = "status = 'FINISHED'",
-  output_format = "pandas"
-)
-
-target_run_id = runs_df.loc[0, "run_id"]
-val_loss = runs_df.loc[0, "metrics.val_loss"]
-print(f"Run ID '{target_run_id}' has the best val_loss metric ({val_loss}); selecting it for inference")
-runs_df.head()
+!pip install -q --upgrade pip && pip install -q pytorch_lightning==1.8.6 transformers
 
 # COMMAND ----------
 
 from insuranceqa.datasets.insuranceqa import InsuranceDataset
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 from insuranceqa.models.distilbert_insuranceqa import LitModel
+import mlflow
 import pandas as pd
-from pyspark.sql.functions import pandas_udf, PandasUDFType
+from pyspark.sql.functions import pandas_udf, PandasUDFType, struct, col
 import torch
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
-from pyspark.sql.functions import struct, col
+model_info = mlflow.models.get_model_info("models:/distilbert_en_uncased_insuranceqa/latest")
+target_run_id = model_info.run_id
+print(f"Model run_id: {target_run_id}")
 
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 mlflow.artifacts.download_artifacts(
@@ -67,8 +56,9 @@ def predict(pdf):
   
   label_list = []
   dataset = InsuranceDataset(questions = pdf.question_en.values)
-  dataloader = DataLoader(dataset, batch_size = 256, shuffle = False, num_workers = 4)
+  dataloader = DataLoader(dataset, batch_size = 32, shuffle = False, num_workers = 4)
   trainer = pl.Trainer(accelerator = "gpu" if torch.cuda.is_available() else "cpu")
+  loaded_model.value.eval()
   pred = trainer.predict(loaded_model.value, dataloader)
 
   pred_list = []
@@ -101,6 +91,11 @@ valid_df = spark.sql("select id, question_en, topic_en from insuranceqa.valid")
 valid_df = valid_df.persist(StorageLevel.MEMORY_ONLY)
 valid_df.count()
 
+# For testing purposes
+
+valid_df = valid_df.sample(0.2)
+valid_df.count()
+
 predict_udf = pandas_udf(predict, returnType = IntegerType())
 
 valid_df = valid_df.groupBy(
@@ -124,7 +119,7 @@ intent_df = spark.sql("select topic_id, topic_en as intent from insuranceqa.inte
     .join(intent_df, intent_df.topic_id == valid_df.pred)
     .write
     .saveAsTable(
-      "insuranceqa.valid_pred",
+      "insuranceqa.valid_pred_sample",
       mode = "overwrite",
       mergeSchema = True
     )
