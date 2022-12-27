@@ -354,12 +354,12 @@ with mlflow.start_run(run_name = "distilbert") as run:
 
   accelerator = "gpu" if torch.cuda.is_available() else "cpu"
 
-  # Warning: max_epochs is set to 1 only for testing purposes
+  # Warning: max_epochs is set to 10 only for testing purposes
   # For optimal accuracy, remove the max_epochs param
   # and uncomment "callbacks = [early_stop_callback]"
 
   trainer = pl.Trainer(
-    max_steps = 10,
+    max_epochs = 10,
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
     accelerator=accelerator
