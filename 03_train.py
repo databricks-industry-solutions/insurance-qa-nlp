@@ -197,8 +197,8 @@ from torch.utils.data import DataLoader
 test_data = InsuranceDataset(split = "test")
 
 # Testing purposes; increase batch size when not testing
-train_dataloader = DataLoader(training_data, batch_size=256, shuffle=True, num_workers=8)
-test_dataloader = DataLoader(test_data, batch_size=32, shuffle=False, num_workers=8)
+train_dataloader = DataLoader(training_data, batch_size=256, shuffle=True, num_workers=4)
+test_dataloader = DataLoader(test_data, batch_size=32, shuffle=False, num_workers=4)
 
 # COMMAND ----------
 
@@ -211,12 +211,6 @@ test_dataloader = DataLoader(test_data, batch_size=32, shuffle=False, num_worker
 # MAGIC * Time to declare our Lightning Module!
 # MAGIC * Lightning Module is quite a useful class provided by PyTorch Lightning. It helps us avoid a lot of boiler plate code - and also avoid forgetting about `torch.no_grad()` when running forward pass 😃
 # MAGIC * We can customize how our model is going to be loaded, which layers in the model we are going to train or not, how metrics will be logged, etc.
-
-# COMMAND ----------
-
-for name, param in model.named_parameters():
-  if name in ["classifier.weight", "classifier.bias"]:
-    print(name)
 
 # COMMAND ----------
 
@@ -258,7 +252,7 @@ class LitModel(pl.LightningModule):
 
       if freeze_layers:
         for name, param in self.model.named_parameters():
-          if "distilbert" not in name:
+          if name not in ["classifier.weight", "classifier.bias"]:
               param.requires_grad = False
 
       self.loss = nn.CrossEntropyLoss()
@@ -269,9 +263,9 @@ class LitModel(pl.LightningModule):
 
     @rank_zero_only
     def _log_metrics(self, key, values):
-      if self.training and isinstance(values, list):
+      if self.training and values is not None:
         value = np.mean(values)
-        if value > -1:
+        if value is not None and value != -1:
           self.logger.experiment.log_metric(
             key = key,
             value = value,
@@ -280,9 +274,8 @@ class LitModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
-      loss = self.loss(outputs.logits, batch["labels"])
-      self._log_metrics("loss", loss)
-      return {"loss": loss}
+      losses = self.loss(outputs.logits, batch["labels"])
+      return {"loss": losses}
 
     def training_epoch_end(self, outputs):
       all_preds = [output["loss"].cpu().numpy() for output in outputs]
@@ -362,7 +355,8 @@ with mlflow.start_run(run_name = "distilbert") as run:
     max_epochs = 10,
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
-    accelerator=accelerator
+    accelerator = accelerator,
+    log_every_n_steps = 50
     #callbacks = [early_stop_callback]
   )
 
@@ -434,7 +428,7 @@ for i in range(0, 10):
 # MAGIC 
 # MAGIC <hr />
 # MAGIC 
-# MAGIC * Our model is performing poorly. This is expected - since we're setting *max_steps = 10*, meaning our model hasn't iterated through our training set long enough to learn properly.
+# MAGIC * Our model is performing poorly. This is expected - since we're setting *max_epochs = 10*, meaning our model hasn't iterated through our training set long enough to learn properly.
 # MAGIC * To improve performance, try commenting *max_steps* and uncommenting *max_epochs*, and check the new results!
 # MAGIC * For optimal performance, you should comment both *max_steps* and *max_epochs*, and uncomment the *callbacks* parameter in the *Trainer* declaration. Bear in mind that if training with a CPU, this will take a long time.
 # MAGIC * With Early Callback and training on a GPU, you will be able to achieve **validation loss** of around 0.10 within **30 minutes**

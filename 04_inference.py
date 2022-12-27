@@ -127,7 +127,9 @@ intent_df = spark.sql("select topic_id, topic_en as intent from insuranceqa.inte
 
 # COMMAND ----------
 
-display(valid_df)
+# MAGIC %sql 
+# MAGIC 
+# MAGIC select * from  insuranceqa.valid_pred_sample
 
 # COMMAND ----------
 

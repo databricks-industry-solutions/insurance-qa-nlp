@@ -13,7 +13,7 @@ class LitModel(pl.LightningModule):
         loss,
         model_name_or_path: str = "distilbert-base-uncased",
         num_labels: int = 12,
-        learning_rate: float = 1e-3,
+        learning_rate: float = 1e-4,
         adam_epsilon: float = 1e-8,
         warmup_steps: int = 0,
         weight_decay: float = 1e-10,
@@ -47,13 +47,14 @@ class LitModel(pl.LightningModule):
 
     @rank_zero_only
     def _log_metrics(self, key, values):
-      if self.training and isinstance(values, list):
+      if self.training:
         value = np.mean(values)
-        self.logger.experiment.log_metric(
-          key = key,
-          value = value,
-          run_id = self.logger.run_id
-        )
+        if value is not None and value != -1:
+          self.logger.experiment.log_metric(
+            key = key,
+            value = value,
+            run_id = self.logger.run_id
+          )
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
