@@ -41,14 +41,14 @@ job_json = {
         },
         "tasks": [
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_ingest",
                 "notebook_task": {
                     "notebook_path": f"00_README"
                 },
                 "task_key": "ins_qa_00"
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_ingest",
                 "notebook_task": {
                     "notebook_path": f"01_ingest"
                 },
@@ -60,7 +60,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_ingest",
                 "notebook_task": {
                     "notebook_path": f"02_explore_and_clean"
                 },
@@ -72,7 +72,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_train_inference",
                 "libraries": [
                     {
                         "pypi": {
@@ -96,7 +96,19 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_train_inference",
+                "libraries": [
+                    {
+                        "pypi": {
+                            "package": "pytorch_lightning==1.8.6"
+                        }
+                    },
+                    {
+                        "pypi": {
+                            "package": "transformers"
+                        }
+                    }
+                ],
                 "notebook_task": {
                     "notebook_path": f"04_inference"
                 },
@@ -110,28 +122,28 @@ job_json = {
         ],
         "job_clusters": [
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_ingest",
                 "new_cluster": {
-                    "spark_version": "12.0.x-gpu-ml-scala2.12",
+                    "spark_version": "12.0.x-cpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
                     "num_workers": 1,
-                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
+                    "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
                     "custom_tags": {
                         "usage": "solacc_testing"
                     },
                 }
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_train_inference",
                 "new_cluster": {
                     "spark_version": "12.0.x-gpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
                     "num_workers": 1,
-                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
+                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"},
                     "custom_tags": {
                         "usage": "solacc_testing"
                     },
@@ -145,7 +157,3 @@ job_json = {
 dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 NotebookSolutionCompanion().deploy_compute(job_json, run_job=run_job)
-
-# COMMAND ----------
-
-

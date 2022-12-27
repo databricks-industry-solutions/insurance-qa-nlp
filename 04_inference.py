@@ -58,8 +58,8 @@ def predict(pdf):
   dataset = InsuranceDataset(questions = pdf.question_en.values)
   dataloader = DataLoader(dataset, batch_size = 32, shuffle = False, num_workers = 4)
   trainer = pl.Trainer(accelerator = "gpu" if torch.cuda.is_available() else "cpu")
-  loaded_model.value.eval()
-  pred = trainer.predict(loaded_model.value, dataloader)
+  with torch.no_grad():
+    pred = trainer.predict(loaded_model.value, dataloader)
 
   pred_list = []
   for item in pred:

@@ -47,7 +47,7 @@ class LitModel(pl.LightningModule):
 
     @rank_zero_only
     def _log_metrics(self, key, values):
-      if self.training:
+      if self.training and values is not None:
         value = np.mean(values)
         if value is not None and value != -1:
           self.logger.experiment.log_metric(
@@ -58,9 +58,8 @@ class LitModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
-      loss = self.loss(outputs.logits, batch["labels"])
-      self._log_metrics("loss", loss)
-      return {"loss": loss}
+      losses = self.loss(outputs.logits, batch["labels"])
+      return {"loss": losses}
 
     def training_epoch_end(self, outputs):
       all_preds = [output["loss"].cpu().numpy() for output in outputs]
