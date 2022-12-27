@@ -13,7 +13,7 @@ class LitModel(pl.LightningModule):
         loss,
         model_name_or_path: str = "distilbert-base-uncased",
         num_labels: int = 12,
-        learning_rate: float = 1e-4,
+        learning_rate: float = 1e-3,
         adam_epsilon: float = 1e-8,
         warmup_steps: int = 0,
         weight_decay: float = 1e-10,
@@ -36,7 +36,7 @@ class LitModel(pl.LightningModule):
 
       if freeze_layers:
         for name, param in self.model.named_parameters():
-          if "distilbert" in name:
+          if name not in ["classifier.weight", "classifier.bias"]:
               param.requires_grad = False
 
       self.loss = nn.CrossEntropyLoss()
@@ -47,17 +47,18 @@ class LitModel(pl.LightningModule):
 
     @rank_zero_only
     def _log_metrics(self, key, values):
-      value = np.mean(values)
-      self.logger.experiment.log_metric(
-        key = key,
-        value = value,
-        run_id = self.logger.run_id
-      )
+      if self.training and isinstance(values, list):
+        value = np.mean(values)
+        self.logger.experiment.log_metric(
+          key = key,
+          value = value,
+          run_id = self.logger.run_id
+        )
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
       loss = self.loss(outputs.logits, batch["labels"])
-      self.log("loss", loss)
+      self._log_metrics("loss", loss)
       return {"loss": loss}
 
     def training_epoch_end(self, outputs):
@@ -68,12 +69,11 @@ class LitModel(pl.LightningModule):
       outputs = self(**batch)
       loss = self.loss(outputs.logits, batch["labels"])
       metric = {"val_loss": loss}
-      self.log("val_loss", loss)
+      self._log_metrics("val_loss", loss)
       return metric
 
     def validation_epoch_end(self, outputs):
       all_preds = [output["val_loss"].cpu().numpy() for output in outputs]
-      self.log("val_loss", np.mean(all_preds))
       self._log_metrics("val_loss", all_preds)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):

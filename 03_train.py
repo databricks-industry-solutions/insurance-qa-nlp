@@ -25,6 +25,10 @@
 
 # COMMAND ----------
 
+!pip install -q --upgrade pip && pip install -q pytorch_lightning==1.8.6 transformers
+
+# COMMAND ----------
+
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
@@ -119,7 +123,12 @@ class InsuranceDataset(Dataset):
         self.weights = torch.tensor(weights_df["weight"].values)
 
       class_mappings = training_data.class_mappings
-      weights = [(class_mappings[row[1]], row[0]) for row in list(itertools.chain(spark.sql(query).toLocalIterator()))]
+      weights = [
+        (class_mappings[row[1]], row[0])
+        for row in list(
+          itertools.chain(spark.sql(query).toLocalIterator())
+        )
+      ]
       weights_dict = collections.OrderedDict(sorted(dict(weights).items()))
       weights_tensor = torch.tensor([weight[1] for weight in weights_dict.items()])
       self.weights = weights_tensor
@@ -186,8 +195,10 @@ training_data[0]
 from torch.utils.data import DataLoader
 
 test_data = InsuranceDataset(split = "test")
-train_dataloader = DataLoader(training_data, batch_size=128, shuffle=True, num_workers=4)
-test_dataloader = DataLoader(test_data, batch_size=16, shuffle=False, num_workers=4)
+
+# Testing purposes; increase batch size when not testing
+train_dataloader = DataLoader(training_data, batch_size=256, shuffle=True, num_workers=8)
+test_dataloader = DataLoader(test_data, batch_size=32, shuffle=False, num_workers=8)
 
 # COMMAND ----------
 
@@ -200,6 +211,12 @@ test_dataloader = DataLoader(test_data, batch_size=16, shuffle=False, num_worker
 # MAGIC * Time to declare our Lightning Module!
 # MAGIC * Lightning Module is quite a useful class provided by PyTorch Lightning. It helps us avoid a lot of boiler plate code - and also avoid forgetting about `torch.no_grad()` when running forward pass 😃
 # MAGIC * We can customize how our model is going to be loaded, which layers in the model we are going to train or not, how metrics will be logged, etc.
+
+# COMMAND ----------
+
+for name, param in model.named_parameters():
+  if name in ["classifier.weight", "classifier.bias"]:
+    print(name)
 
 # COMMAND ----------
 
@@ -241,7 +258,7 @@ class LitModel(pl.LightningModule):
 
       if freeze_layers:
         for name, param in self.model.named_parameters():
-          if "distilbert" in name:
+          if "distilbert" not in name:
               param.requires_grad = False
 
       self.loss = nn.CrossEntropyLoss()
@@ -252,17 +269,19 @@ class LitModel(pl.LightningModule):
 
     @rank_zero_only
     def _log_metrics(self, key, values):
-      value = np.mean(values)
-      self.logger.experiment.log_metric(
-        key = key,
-        value = value,
-        run_id = self.logger.run_id
-      )
+      if self.training and isinstance(values, list):
+        value = np.mean(values)
+        if value > -1:
+          self.logger.experiment.log_metric(
+            key = key,
+            value = value,
+            run_id = self.logger.run_id
+          )
 
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
       loss = self.loss(outputs.logits, batch["labels"])
-      self.log("loss", loss)
+      self._log_metrics("loss", loss)
       return {"loss": loss}
 
     def training_epoch_end(self, outputs):
@@ -273,12 +292,11 @@ class LitModel(pl.LightningModule):
       outputs = self(**batch)
       loss = self.loss(outputs.logits, batch["labels"])
       metric = {"val_loss": loss}
-      self.log("val_loss", loss)
+      self._log_metrics("val_loss", loss)
       return metric
 
     def validation_epoch_end(self, outputs):
       all_preds = [output["val_loss"].cpu().numpy() for output in outputs]
-      self.log("val_loss", np.mean(all_preds))
       self._log_metrics("val_loss", all_preds)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -336,16 +354,20 @@ with mlflow.start_run(run_name = "distilbert") as run:
 
   accelerator = "gpu" if torch.cuda.is_available() else "cpu"
 
+  # Warning: max_epochs is set to 1 only for testing purposes
+  # For optimal accuracy, remove the max_epochs param
+  # and uncomment "callbacks = [early_stop_callback]"
+
   trainer = pl.Trainer(
-    max_steps = 10, # Testing purposes; increase this for better accuracy
+    max_steps = 10,
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
-    accelerator=accelerator,
-    devices = 1,
-    callbacks = [early_stop_callback]
+    accelerator=accelerator
+    #callbacks = [early_stop_callback]
   )
 
 # Make sure to run this on a GPU cluster, otherwise it will take longer to train
+# (approx. 1.5 hours on CPU for 10 epochs)
 
   trainer.fit(
     lit_model,
@@ -392,7 +414,9 @@ def predict(question = "how do i get car insurance?", ground_truth = "auto-insur
 
 # COMMAND ----------
 
+# DBTITLE 1,Seeing how our model performs with Test Data
 for i in range(0, 10):
+  # sample(1) to shuffle data
   sample = test_data.df.sample(1)
   question = sample["question_en"].values[0]
   topic = sample["topic_en"].values[0]
@@ -404,23 +428,36 @@ for i in range(0, 10):
 
 # COMMAND ----------
 
-# DBTITLE 1,Logging our Artifact and Registering our Model
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Initial Analysis
+# MAGIC 
+# MAGIC <hr />
+# MAGIC 
+# MAGIC * Our model is performing poorly. This is expected - since we're setting *max_steps = 10*, meaning our model hasn't iterated through our training set long enough to learn properly.
+# MAGIC * To improve performance, try commenting *max_steps* and uncommenting *max_epochs*, and check the new results!
+# MAGIC * For optimal performance, you should comment both *max_steps* and *max_epochs*, and uncomment the *callbacks* parameter in the *Trainer* declaration. Bear in mind that if training with a CPU, this will take a long time.
+# MAGIC * With Early Callback and training on a GPU, you will be able to achieve **validation loss** of around 0.10 within **30 minutes**
+
+# COMMAND ----------
+
+# DBTITLE 1,Looking at the runs registered in MLflow for our model
 import pickle
 
 experiment = mlflow.set_experiment('/Users/{}/insurance_qa'.format(username))
 runs_df = mlflow.search_runs(
   experiment_ids = [experiment.experiment_id],
-  order_by = ["metrics.val_loss"],
+  order_by = ["start_time DESC"],
   filter_string = "status = 'FINISHED'",
   output_format = "pandas"
 )
 
 target_run_id = runs_df.loc[0,"run_id"]
-print(target_run_id)
-runs_df
+runs_df.head()
 
 # COMMAND ----------
 
+# DBTITLE 1,Registering the best performing run so far as a model
 with mlflow.start_run(run_id = target_run_id, nested = True) as run:
 
   mlflow.pytorch.log_model(
@@ -433,3 +470,7 @@ with mlflow.start_run(run_id = target_run_id, nested = True) as run:
     ],
     registered_model_name = "distilbert_en_uncased_insuranceqa"
   )
+
+# COMMAND ----------
+
+
