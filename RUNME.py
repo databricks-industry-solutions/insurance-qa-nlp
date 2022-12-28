@@ -41,14 +41,14 @@ job_json = {
         },
         "tasks": [
             {
-                "job_cluster_key": "ins_qa_cluster_ingest",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
                     "notebook_path": f"00_README"
                 },
                 "task_key": "ins_qa_00"
             },
             {
-                "job_cluster_key": "ins_qa_cluster_ingest",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
                     "notebook_path": f"01_ingest"
                 },
@@ -60,7 +60,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster_ingest",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
                     "notebook_path": f"02_explore_and_clean"
                 },
