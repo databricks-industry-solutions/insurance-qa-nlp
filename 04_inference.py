@@ -14,7 +14,7 @@
 
 # COMMAND ----------
 
-!pip install -q --upgrade pip && pip install -q pytorch_lightning==1.8.6 transformers
+!pip freeze
 
 # COMMAND ----------
 
@@ -56,7 +56,7 @@ def predict(pdf):
   
   label_list = []
   dataset = InsuranceDataset(questions = pdf.question_en.values)
-  dataloader = DataLoader(dataset, batch_size = 32, shuffle = False, num_workers = 4)
+  dataloader = DataLoader(dataset, batch_size = 128, shuffle = False, num_workers = 4)
   trainer = pl.Trainer(accelerator = "gpu" if torch.cuda.is_available() else "cpu")
   with torch.no_grad():
     pred = trainer.predict(loaded_model.value, dataloader)
@@ -89,11 +89,6 @@ spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
 
 valid_df = spark.sql("select id, question_en, topic_en from insuranceqa.valid")
 valid_df = valid_df.persist(StorageLevel.MEMORY_ONLY)
-valid_df.count()
-
-# For testing purposes
-
-valid_df = valid_df.sample(0.3)
 valid_df.count()
 
 predict_udf = pandas_udf(predict, returnType = IntegerType())

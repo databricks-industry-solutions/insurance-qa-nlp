@@ -116,7 +116,7 @@ job_json = {
                 "new_cluster": {
                     "spark_version": "12.0.x-gpu-ml-scala2.12",
                     "spark_conf": {
-                        "spark.databricks.delta.formatCheck.enabled": "false"
+                        "spark.databricks.delta.formatCheck.enabled": "false",
                         },
                     "num_workers": 1,
                     "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"},
@@ -145,3 +145,7 @@ job_json = {
 dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 NotebookSolutionCompanion().deploy_compute(job_json, run_job=run_job)
+
+# COMMAND ----------
+
+
