@@ -136,7 +136,7 @@ job_json = {
                         "spark.databricks.delta.formatCheck.enabled": "false",
                         },
                     "num_workers": 1,
-                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"},
+                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_DS3_v2", "GCP": "a2-highgpu-1g"},
                     "custom_tags": {
                         "usage": "solacc_testing"
                     } 
