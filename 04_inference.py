@@ -14,7 +14,7 @@
 
 # COMMAND ----------
 
-!pip freeze
+!pip install -q --upgrade pip && pip install -q transformers pytorch-lightning==1.8.6
 
 # COMMAND ----------
 
@@ -88,16 +88,22 @@ import pytorch_lightning as pl
 
 spark.conf.set("spark.sql.adaptive.enabled", False)
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-spark.conf.set("spark.sql.shuffle.partitions", 4)
+spark.conf.set("spark.sql.shuffle.partitions", 5)
 
 valid_df = spark.sql("select id, question_en, topic_en from insuranceqa.valid")
+
+
+# Testing purposes, comment the line below for full data
+valid_df = valid_df.sample(0.3)
+valid_df.count()
+
 valid_df = valid_df.cache()
 valid_df.count()
 
-# Might want to increase for higher degree of
+# Might want to increase number of partitions for higher degree of
 # parallelization
 
-valid_df = valid_df.repartition(4)
+valid_df = valid_df.repartition(5)
 valid_df.count()
 
 predict_udf = pandas_udf(predict, returnType = IntegerType())
@@ -128,13 +134,3 @@ intent_df = spark.sql("select topic_id, topic_en as intent from insuranceqa.inte
       mergeSchema = True
     )
 )
-
-# COMMAND ----------
-
-# MAGIC %sql 
-# MAGIC 
-# MAGIC select * from  insuranceqa.valid_pred_sample
-
-# COMMAND ----------
-
-

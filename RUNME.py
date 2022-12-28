@@ -72,7 +72,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster_train_inference",
+                "job_cluster_key": "ins_qa_cluster_train",
                 "notebook_task": {
                     "notebook_path": f"03_train"
                 },
@@ -84,11 +84,28 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster_train_inference",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
                     "notebook_path": f"04_inference"
                 },
                 "task_key": "ins_qa_04",
+                "libraries": [
+                  {
+                      "pypi": {
+                          "package": "pytorch-lightning==1.8.6"
+                      }
+                  },
+                  {
+                      "pypi": {
+                          "package": "transformers"
+                      }
+                  },
+                  {
+                      "pypi": {
+                          "package": "tensorflow"
+                      }
+                  }
+                ], 
                 "depends_on": [
                     {
                         "task_key": "ins_qa_03"
@@ -98,7 +115,7 @@ job_json = {
         ],
         "job_clusters": [
             {
-                "job_cluster_key": "ins_qa_cluster_ingest",
+                "job_cluster_key": "ins_qa_cluster",
                 "new_cluster": {
                     "spark_version": "12.0.x-cpu-ml-scala2.12",
                 "spark_conf": {
@@ -112,7 +129,7 @@ job_json = {
                 }
             },
             {
-                "job_cluster_key": "ins_qa_cluster_train_inference",
+                "job_cluster_key": "ins_qa_cluster_train",
                 "new_cluster": {
                     "spark_version": "12.0.x-gpu-ml-scala2.12",
                     "spark_conf": {
@@ -122,19 +139,7 @@ job_json = {
                     "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"},
                     "custom_tags": {
                         "usage": "solacc_testing"
-                    },
-                    "libraries": [
-                      {
-                          "pypi": {
-                              "package": "pytorch_lightning==1.8.6"
-                          }
-                      },
-                      {
-                          "pypi": {
-                              "package": "transformers"
-                          }
-                      }
-                    ],  
+                    } 
                   }
             }
         ]

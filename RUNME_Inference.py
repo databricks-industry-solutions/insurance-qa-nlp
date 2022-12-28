@@ -62,7 +62,7 @@ job_json = {
                           "package": "tensorflow"
                       }
                   }
-                ],  
+                ], 
             }
         ],
         "job_clusters": [
