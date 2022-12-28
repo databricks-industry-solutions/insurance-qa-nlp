@@ -87,6 +87,7 @@ def pipeline(path, output_table, database = "insuranceqa"):
 
 splits = ["train", "test", "valid"]
 for split in splits:
+  spark.sql(f"drop table if exists insuranceqa.{split}")
   pipeline(
     f"{dbfs_path.replace('/dbfs', '')}/{split}.questions.txt",
     f"insuranceqa.{split}"
