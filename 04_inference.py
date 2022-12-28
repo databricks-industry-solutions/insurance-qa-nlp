@@ -57,9 +57,12 @@ def predict(pdf):
   label_list = []
   dataset = InsuranceDataset(questions = pdf.question_en.values)
   dataloader = DataLoader(dataset, batch_size = 128, shuffle = False, num_workers = 4)
-  trainer = pl.Trainer(accelerator = "gpu" if torch.cuda.is_available() else "cpu")
+  trainer = pl.Trainer(
+    accelerator = "gpu" if torch.cuda.is_available() else "cpu",
+    logger = False
+  )
   with torch.no_grad():
-    pred = trainer.predict(loaded_model.value, dataloader)
+    pred = trainer.predict(model = loaded_model.value, dataloaders = [dataloader], return_predictions = True)
 
   pred_list = []
   for item in pred:
@@ -78,7 +81,6 @@ predict(test_df)
 # COMMAND ----------
 
 from pyspark.sql import functions as F
-from pyspark import StorageLevel
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from insuranceqa.datasets.insuranceqa import InsuranceDataset
 from torch.utils.data import DataLoader
@@ -86,9 +88,16 @@ import pytorch_lightning as pl
 
 spark.conf.set("spark.sql.adaptive.enabled", False)
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
+spark.conf.set("spark.sql.shuffle.partitions", 4)
 
 valid_df = spark.sql("select id, question_en, topic_en from insuranceqa.valid")
-valid_df = valid_df.persist(StorageLevel.MEMORY_ONLY)
+valid_df = valid_df.cache()
+valid_df.count()
+
+# Might want to increase for higher degree of
+# parallelization
+
+valid_df = valid_df.repartition(4)
 valid_df.count()
 
 predict_udf = pandas_udf(predict, returnType = IntegerType())
