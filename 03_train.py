@@ -197,7 +197,7 @@ from torch.utils.data import DataLoader
 test_data = InsuranceDataset(split = "test")
 
 # Testing purposes; increase batch size when not testing
-train_dataloader = DataLoader(training_data, batch_size=256, shuffle=True, num_workers=4)
+train_dataloader = DataLoader(training_data, batch_size=512, shuffle=True, num_workers=4)
 test_dataloader = DataLoader(test_data, batch_size=32, shuffle=False, num_workers=4)
 
 # COMMAND ----------
@@ -255,42 +255,53 @@ class LitModel(pl.LightningModule):
           if name not in ["classifier.weight", "classifier.bias"]:
               param.requires_grad = False
 
-      self.loss = nn.CrossEntropyLoss()
+      if loss:
+        self.loss = loss
+      else: 
+        self.loss = nn.CrossEntropyLoss()
 
     def forward(self, **inputs):
       output = self.model(**inputs)
       return output
 
-    @rank_zero_only
-    def _log_metrics(self, key, values):
-      if self.training and values is not None:
-        value = np.mean(values)
-        if value is not None and value != -1:
-          self.logger.experiment.log_metric(
-            key = key,
-            value = value,
-            run_id = self.logger.run_id
-          )
-
     def training_step(self, batch, batch_idx):
       outputs = self(**batch)
-      losses = self.loss(outputs.logits, batch["labels"])
-      return {"loss": losses}
+      loss = self.loss(outputs.logits, batch["labels"])
+      self.logger.experiment.log_metric(
+        key = "loss",
+        value = loss,
+        run_id = self.logger.run_id
+      )
+      return {"loss": loss}
 
     def training_epoch_end(self, outputs):
-      all_preds = [output["loss"].cpu().numpy() for output in outputs]
-      self._log_metrics("loss", all_preds)
+      losses = [output["loss"].cpu().numpy() for output in outputs]
+      loss = np.mean(losses)
+      self.logger.experiment.log_metric(
+        key = "loss",
+        value = loss,
+        run_id = self.logger.run_id
+      )
 
     def validation_step(self, batch, batch_idx, dataloader_idx = 0):
       outputs = self(**batch)
       loss = self.loss(outputs.logits, batch["labels"])
       metric = {"val_loss": loss}
-      self._log_metrics("val_loss", loss)
+      self.logger.experiment.log_metric(
+        key = "val_loss",
+        value = loss,
+        run_id = self.logger.run_id
+      )
       return metric
 
     def validation_epoch_end(self, outputs):
-      all_preds = [output["val_loss"].cpu().numpy() for output in outputs]
-      self._log_metrics("val_loss", all_preds)
+      losses = [output["val_loss"].cpu().numpy() for output in outputs]
+      loss = np.mean(losses)
+      self.logger.experiment.log_metric(
+        key = "val_loss",
+        value = loss,
+        run_id = self.logger.run_id
+      )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
       y_hat = self.model(**batch)
@@ -352,11 +363,11 @@ with mlflow.start_run(run_name = "distilbert") as run:
   # and uncomment "callbacks = [early_stop_callback]"
 
   trainer = pl.Trainer(
-    max_epochs = 10,
+    max_epochs = 3,
     default_root_dir = "/tmp/insuranceqa",
     logger = mlf_logger,
     accelerator = accelerator,
-    log_every_n_steps = 50
+    log_every_n_steps = 5
     #callbacks = [early_stop_callback]
   )
 

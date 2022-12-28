@@ -93,7 +93,7 @@ valid_df.count()
 
 # For testing purposes
 
-valid_df = valid_df.sample(0.2)
+valid_df = valid_df.sample(0.3)
 valid_df.count()
 
 predict_udf = pandas_udf(predict, returnType = IntegerType())
