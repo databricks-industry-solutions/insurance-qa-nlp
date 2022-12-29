@@ -4,25 +4,34 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Insurance Q&A Intent Classification with Databricks & Hugging Face
+# MAGIC <div >
+# MAGIC   <img src="https://cme-solution-accelerators-images.s3-us-west-2.amazonaws.com/toxicity/solution-accelerator-logo.png"; width="50%">
+# MAGIC </div>
 # MAGIC 
-# MAGIC <img src="https://github.com/rafaelvp-db/dbx-insurance-qa-hugging-face/blob/master/img/header.png?raw=true" />
+# MAGIC ## Overview
 # MAGIC 
-# MAGIC <hr />
+# MAGIC While companies across industries have accelerated digital adoption, are insurers meeting the ever-changing demands from customers? As an insurer, are you spending most of your time and resources into creating business value?
 # MAGIC 
-# MAGIC **TLDR;** this repo contains code that showcases the process of:
-# MAGIC * Ingesting data related to Insurance questions and answers ([Insurance QA Dataset](https://github.com/shuzi/insuranceQA)) into Delta Lake
-# MAGIC * Basic cleaning and preprocessing
-# MAGIC * Creating custom [PyTorch Lightning](https://www.pytorchlightning.ai/) `DataModule` and `LightningModule` to wrap, respectively, our dataset and our backbone model (`distilbert_en_uncased`)
-# MAGIC * Training with multiple GPUs while logging desired metrics into MLflow and registering model assets into Databricks Model Registry
-# MAGIC * Running inference both with single and multiple nodes
+# MAGIC Customer service is a vital part of the insurance business, for multiple business cases, from marketing, to customer retention and claims. By digitalizing these processes, insurers can seamlessly scale their operations and shift money and resources from operational processes to actual product and value creation.
 # MAGIC 
+# MAGIC This solutions accelerator is a head start on developing and deploying a machine learning solution to detect customer intents based on pieces of text from an Interactive Voice Response (IVR) stream or from a virtual agent.
 # MAGIC 
-# MAGIC ## Additional Reference
+# MAGIC **Authors**
 # MAGIC 
-# MAGIC 1. Minwei Feng, Bing Xiang, Michael R. Glass, Lidan Wang, Bowen Zhou. [Applying Deep Learning to Answer Selection: A Study and An Open Task](https://arxiv.org/abs/1508.01585)
-# MAGIC 2. [Fine-tune Transformers Models with PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/stable/notebooks/lightning_examples/text-transformers.html)
-# MAGIC 3. [PyTorch Lightning MLflow Logger](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.mlflow.html)
+# MAGIC * Rafael Piere ([rafael.pierre@databricks.com](mailto:rafael.pierre@databricks.com))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Copyright Databricks, Inc. [2022]. The source in this notebook is provided subject to the [Databricks License](https://databricks.com/db-license-source).  All included or referenced third party libraries are subject to the licenses set forth below.
+# MAGIC 
+# MAGIC |Library Name|Library license | Library License URL | Library Source URL |
+# MAGIC |---|---|---|---|
+# MAGIC |PyTorch|BSD License| https://github.com/pytorch/pytorch/blob/master/LICENSE| https://github.com/pytorch/pytorch/|
+# MAGIC |PyTorch Lightning|Apache-2.0 License |https://github.com/Lightning-AI/lightning/blob/master/LICENSE|https://github.com/Lightning-AI/lightning/|
+# MAGIC |Python|Python Software Foundation (PSF) |https://github.com/python/cpython/blob/master/LICENSE|https://github.com/python/cpython|
+# MAGIC |Spark|Apache-2.0 License |https://github.com/apache/spark/blob/master/LICENSE|https://github.com/apache/spark|
+# MAGIC |Transformers|Apache 2.0|https://github.com/huggingface/transformers/blob/main/LICENSE|https://github.com/huggingface/transformers/|
 
 # COMMAND ----------
 

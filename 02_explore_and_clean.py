@@ -10,23 +10,23 @@
 # MAGIC 
 # MAGIC <hr />
 # MAGIC 
-# MAGIC <img src="https://raw.githubusercontent.com/rafaelvp-db/dbx-insurance-qa-hugging-face/master/img/header.png" width="800px"/>
+# MAGIC <img src="https://raw.githubusercontent.com/rafaelvp-db/dbx-insurance-qa-hugging-face/master/img/header.png" width="100%"/>
 
 # COMMAND ----------
 
-!pip install -q wordcloud
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ### Looking at the amount of intents
+# MAGIC ### Looking the different intents in our dataset
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC 
-# MAGIC select distinct(topic_en) from insuranceqa.train
+# MAGIC select * from insuranceqa.intent
 
 # COMMAND ----------
 
@@ -82,7 +82,7 @@ def remove_outliers(df):
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ## Looking at the most common terms
+# MAGIC ## Extracting the Lemmas from our Data
 
 # COMMAND ----------
 
@@ -129,7 +129,16 @@ display(df_lemmas)
 
 # COMMAND ----------
 
-# DBTITLE 1,Visualizing most common terms with a Wordcloud
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Visualizing most common lemmas in the dataset with a Wordcloud
+
+# COMMAND ----------
+
+!pip install -q wordcloud
+
+# COMMAND ----------
+
 from wordcloud import WordCloud
 from matplotlib import pyplot as plt
 import itertools
