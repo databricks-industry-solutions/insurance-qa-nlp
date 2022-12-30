@@ -161,3 +161,10 @@ plt.show()
 # DBTITLE 1,Removing Outliers
 df_lemmas = remove_outliers(df_lemmas)
 df_lemmas.write.saveAsTable(name = "insuranceqa.train", mode = "overwrite", mergeSchema = True)
+
+# COMMAND ----------
+
+# DBTITLE 1,Extracting Lemmas from our Validation Set
+df_valid = spark.sql("select * from insuranceqa.valid")
+df_valid_lemmas = df_valid.withColumn("lemmas", lemmatize("question_en"))
+df_valid_lemmas.write.saveAsTable(name = "insuranceqa.valid", mode = "overwrite", mergeSchema = True)
