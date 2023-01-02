@@ -1,0 +1,876 @@
+{
+  "queries": [
+    {
+      "id": "624efc51-8cea-43aa-b765-52dcb010fe57",
+      "name": "accuracy_breakdown",
+      "description": null,
+      "query": "select (p.correct / t.total) * 100 as accuracy, t.topic_en from \n(\n\tselect count(1) as total, topic_en from valid_pred\n\tgroup by topic_en\n) as t\ninner join\n(\n\tselect count(1) as correct, topic_en, intent from valid_pred\n\twhere topic_en = intent\n\tgroup by topic_en, intent\n) as p\non t.topic_en = p.topic_en\norder by accuracy\n",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314848",
+        "visualization_control_order": [],
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "52222049-8316-4691-b572-bbf25030038b",
+          "type": "CHART",
+          "name": "Combo 1",
+          "description": "",
+          "options": {
+            "version": 2,
+            "globalSeriesType": "combo",
+            "sortX": false,
+            "sortY": true,
+            "legend": {
+              "traceorder": "normal"
+            },
+            "xAxis": {
+              "type": "category",
+              "labels": {
+                "enabled": true
+              }
+            },
+            "yAxis": [
+              {
+                "type": "-"
+              },
+              {
+                "type": "-",
+                "opposite": true
+              }
+            ],
+            "alignYAxesAtZero": true,
+            "error_y": {
+              "type": "data",
+              "visible": true
+            },
+            "series": {
+              "stacking": null,
+              "error_y": {
+                "type": "data",
+                "visible": true
+              }
+            },
+            "seriesOptions": {
+              "column_9954d09b54537": {
+                "name": "accuracy",
+                "yAxis": 0
+              },
+              "column_9954d09b54620": {
+                "yAxis": 0,
+                "type": "column"
+              }
+            },
+            "valuesOptions": {},
+            "direction": {
+              "type": "counterclockwise"
+            },
+            "sizemode": "diameter",
+            "coefficient": 1,
+            "numberFormat": "0,0[.]0",
+            "percentFormat": "0[.]00%",
+            "textFormat": "",
+            "missingValuesAsZero": true,
+            "useAggregationsUi": true,
+            "swappedAxes": false,
+            "dateTimeFormat": "YYYY-MM-DD HH:mm",
+            "showDataLabels": true,
+            "columnConfigurationMap": {
+              "x": {
+                "column": "topic_en",
+                "id": "column_9954d09b54703"
+              },
+              "y": [
+                {
+                  "id": "column_9954d09b54620",
+                  "column": "accuracy",
+                  "transform": "SUM"
+                }
+              ]
+            },
+            "isAggregationOn": true,
+            "reverseX": true,
+            "hideXAxis": false,
+            "hideYAxes": true
+          },
+          "query_plan": {
+            "selects": [
+              {
+                "column": "topic_en"
+              },
+              {
+                "function": "SUM",
+                "args": [
+                  {
+                    "column": "accuracy"
+                  }
+                ],
+                "alias": "column_9954d09b54620"
+              }
+            ],
+            "groups": [
+              {
+                "column": "topic_en"
+              }
+            ]
+          }
+        },
+        {
+          "id": "d3eb1122-c03f-41d5-a140-e32a03b4c981",
+          "type": "TABLE",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2
+          },
+          "query_plan": null
+        }
+      ]
+    },
+    {
+      "id": "b0498a0b-05ec-4224-8d6c-3dd97d9e4ce0",
+      "name": "top_topic",
+      "description": null,
+      "query": "select count(1) as qty, topic_en as question_count from valid_pred\ngroup by topic_en\norder by qty desc\nlimit 1",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314851",
+        "visualization_control_order": [],
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "dcb736f1-683d-4246-bf6e-caabd8f14946",
+          "type": "COUNTER",
+          "name": "Counter 1",
+          "description": "",
+          "options": {
+            "counterLabel": "questions",
+            "counterColName": "qty",
+            "rowNumber": 1,
+            "targetRowNumber": 1,
+            "stringDecimal": 0,
+            "stringDecChar": ".",
+            "stringThouSep": ",",
+            "tooltipFormat": "0,0.000",
+            "targetColName": "question_count",
+            "formatTargetValue": true
+          },
+          "query_plan": null
+        },
+        {
+          "id": "e5988f5e-d2ed-4c90-a6a6-de61d0b683b2",
+          "type": "TABLE",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2
+          },
+          "query_plan": null
+        }
+      ]
+    },
+    {
+      "id": "2389e168-2162-45af-b7a4-79f4820627b8",
+      "name": "topic_count",
+      "description": null,
+      "query": "select count(1), topic_en as question_count from valid_pred\ngroup by topic_en LIMIT 1000",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314850",
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "0e7d4326-6688-4df5-aa5f-85295d366c96",
+          "type": "CHART",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2,
+            "globalSeriesType": "bubble",
+            "sortX": true,
+            "sortY": true,
+            "legend": {
+              "traceorder": "normal"
+            },
+            "xAxis": {
+              "type": "-",
+              "labels": {
+                "enabled": true
+              }
+            },
+            "yAxis": [
+              {
+                "type": "linear"
+              },
+              {
+                "type": "-",
+                "opposite": true
+              }
+            ],
+            "alignYAxesAtZero": true,
+            "error_y": {
+              "type": "data",
+              "visible": true
+            },
+            "series": {
+              "stacking": null,
+              "error_y": {
+                "type": "data",
+                "visible": true
+              }
+            },
+            "seriesOptions": {
+              "count(1)": {
+                "yAxis": 0,
+                "type": "bubble"
+              }
+            },
+            "valuesOptions": {},
+            "direction": {
+              "type": "counterclockwise"
+            },
+            "sizemode": "diameter",
+            "coefficient": 0.2,
+            "numberFormat": "0,0[.]00000",
+            "percentFormat": "0[.]00%",
+            "textFormat": "",
+            "missingValuesAsZero": true,
+            "useAggregationsUi": true,
+            "swappedAxes": false,
+            "dateTimeFormat": "YYYY-MM-DD HH:mm",
+            "showDataLabels": false,
+            "columnConfigurationMap": {
+              "x": {
+                "column": "question_count",
+                "id": "column_cd4bdd6f24"
+              },
+              "y": [
+                {
+                  "column": "count(1)",
+                  "id": "column_cd4bdd6f25"
+                }
+              ],
+              "series": {
+                "column": "question_count",
+                "id": "column_cd4bdd6f27"
+              },
+              "size": {
+                "column": "count(1)",
+                "id": "column_cd4bdd6f26"
+              }
+            },
+            "hideYAxes": false,
+            "hideXAxis": true
+          },
+          "query_plan": {
+            "selects": [
+              {
+                "column": "question_count"
+              },
+              {
+                "column": "count(1)"
+              },
+              {
+                "column": "question_count"
+              },
+              {
+                "column": "count(1)"
+              }
+            ]
+          }
+        },
+        {
+          "id": "596869fb-1ac8-4933-b1d9-d65d75c6de0c",
+          "type": "CHART",
+          "name": "Bar 1",
+          "description": "",
+          "options": {
+            "version": 2,
+            "globalSeriesType": "column",
+            "sortX": true,
+            "sortY": true,
+            "legend": {
+              "traceorder": "normal"
+            },
+            "xAxis": {
+              "type": "-",
+              "labels": {
+                "enabled": true
+              }
+            },
+            "yAxis": [
+              {
+                "type": "-"
+              },
+              {
+                "type": "-",
+                "opposite": true
+              }
+            ],
+            "alignYAxesAtZero": true,
+            "error_y": {
+              "type": "data",
+              "visible": true
+            },
+            "series": {
+              "stacking": "",
+              "error_y": {
+                "type": "data",
+                "visible": true
+              },
+              "percentValues": false
+            },
+            "seriesOptions": {
+              "column_1da37a4e7030": {
+                "name": "count(1)",
+                "yAxis": 0,
+                "color": "#604FE9"
+              }
+            },
+            "valuesOptions": {},
+            "direction": {
+              "type": "counterclockwise"
+            },
+            "sizemode": "diameter",
+            "coefficient": 1,
+            "numberFormat": "0,0[.]00000",
+            "percentFormat": "0[.]00%",
+            "textFormat": "",
+            "missingValuesAsZero": true,
+            "useAggregationsUi": true,
+            "swappedAxes": true,
+            "dateTimeFormat": "YYYY-MM-DD HH:mm",
+            "showDataLabels": true,
+            "columnConfigurationMap": {
+              "x": {
+                "column": "question_count",
+                "id": "column_1da37a4e7029"
+              },
+              "y": [
+                {
+                  "column": "count(1)",
+                  "transform": "SUM",
+                  "id": "column_1da37a4e7030"
+                }
+              ]
+            },
+            "isAggregationOn": true,
+            "hideYAxes": false
+          },
+          "query_plan": {
+            "selects": [
+              {
+                "column": "question_count"
+              },
+              {
+                "function": "SUM",
+                "args": [
+                  {
+                    "column": "count(1)"
+                  }
+                ],
+                "alias": "column_1da37a4e7030"
+              }
+            ],
+            "groups": [
+              {
+                "column": "question_count"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "4765754d-46ea-44d4-baba-2f7c19da6d5d",
+      "name": "accuracy",
+      "description": null,
+      "query": "select (p.pred / t.total)*100 from\n(select count(1) as pred from valid_pred where topic_en = intent) as p,\n(select count(1) as total from valid_pred) as t",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314847",
+        "visualization_control_order": [],
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "3537476d-d940-4212-98b3-cf1a9a925ccb",
+          "type": "COUNTER",
+          "name": "Counter 1",
+          "description": "",
+          "options": {
+            "counterLabel": "Accuracy",
+            "counterColName": "((pred / total) * 100)",
+            "rowNumber": 1,
+            "targetRowNumber": 1,
+            "stringDecimal": 2,
+            "stringDecChar": ".",
+            "stringThouSep": ",",
+            "tooltipFormat": "0,0.000",
+            "stringSuffix": "%"
+          },
+          "query_plan": null
+        },
+        {
+          "id": "75c5711d-9ffe-42fd-9e40-566c5eaa51f7",
+          "type": "TABLE",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2
+          },
+          "query_plan": null
+        }
+      ]
+    },
+    {
+      "id": "1408eea2-3096-4519-a67c-8965e90f3e18",
+      "name": "bottom_topic",
+      "description": null,
+      "query": "select count(1) as qty, topic_en as question_count from valid_pred\ngroup by topic_en\norder by qty asc\nlimit 1",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314852",
+        "visualization_control_order": [],
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "48ac484e-b5b1-483c-a216-be8fe9cfe838",
+          "type": "TABLE",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2
+          },
+          "query_plan": null
+        },
+        {
+          "id": "5f79a88d-1b5a-48dc-98e7-8b0cf6ad5349",
+          "type": "COUNTER",
+          "name": "Counter 1",
+          "description": "",
+          "options": {
+            "counterLabel": "questions",
+            "counterColName": "qty",
+            "rowNumber": 1,
+            "targetRowNumber": 1,
+            "stringDecimal": 0,
+            "stringDecChar": ".",
+            "stringThouSep": ",",
+            "tooltipFormat": "0,0.000",
+            "targetColName": "question_count"
+          },
+          "query_plan": null
+        }
+      ]
+    },
+    {
+      "id": "42132f14-d580-4855-a02b-4554f3b7d32c",
+      "name": "valid_pred",
+      "description": null,
+      "query": "select * from hive_metastore.insuranceqa.valid_pred",
+      "options": {
+        "parent": "folders/968903799810018",
+        "apply_auto_limit": true,
+        "folder_node_status": "ACTIVE",
+        "folder_node_internal_name": "tree/4380395087314846",
+        "visualization_control_order": [],
+        "catalog": "hive_metastore",
+        "schema": "insuranceqa",
+        "parameters": []
+      },
+      "visualizations": [
+        {
+          "id": "0288f280-0d1f-47be-8ad1-c87334e31c15",
+          "type": "TABLE",
+          "name": "Results",
+          "description": "",
+          "options": {
+            "version": 2
+          },
+          "query_plan": null
+        },
+        {
+          "id": "25424201-88c8-4f74-867e-6ec41a50ffd3",
+          "type": "TABLE",
+          "name": "Table 1",
+          "description": "",
+          "options": {
+            "itemsPerPage": 25,
+            "condensed": true,
+            "withRowNumber": false,
+            "columns": [
+              {
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "id",
+                "type": "string",
+                "displayAs": "string",
+                "visible": true,
+                "order": 100000,
+                "title": "id",
+                "allowSearch": false,
+                "alignContent": "left",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              },
+              {
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "question_en",
+                "type": "string",
+                "displayAs": "string",
+                "visible": true,
+                "order": 100001,
+                "title": "question_en",
+                "allowSearch": false,
+                "alignContent": "left",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              },
+              {
+                "numberFormat": "0",
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "pred",
+                "type": "integer",
+                "displayAs": "number",
+                "visible": false,
+                "order": 100002,
+                "title": "pred",
+                "allowSearch": false,
+                "alignContent": "right",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              },
+              {
+                "numberFormat": "0",
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "topic_id",
+                "type": "integer",
+                "displayAs": "number",
+                "visible": false,
+                "order": 100003,
+                "title": "topic_id",
+                "allowSearch": false,
+                "alignContent": "right",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              },
+              {
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "topic_en",
+                "type": "string",
+                "displayAs": "string",
+                "visible": true,
+                "order": 100004,
+                "title": "expected_intent",
+                "allowSearch": false,
+                "alignContent": "left",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              },
+              {
+                "booleanValues": [
+                  "false",
+                  "true"
+                ],
+                "imageUrlTemplate": "{{ @ }}",
+                "imageTitleTemplate": "{{ @ }}",
+                "imageWidth": "",
+                "imageHeight": "",
+                "linkUrlTemplate": "{{ @ }}",
+                "linkTextTemplate": "{{ @ }}",
+                "linkTitleTemplate": "{{ @ }}",
+                "linkOpenInNewTab": true,
+                "name": "intent",
+                "type": "string",
+                "displayAs": "string",
+                "visible": true,
+                "order": 100005,
+                "title": "predicted_intent",
+                "allowSearch": false,
+                "alignContent": "left",
+                "allowHTML": false,
+                "highlightLinks": false,
+                "useMonospaceFont": false,
+                "preserveWhitespace": false
+              }
+            ],
+            "version": 2
+          },
+          "query_plan": null
+        }
+      ]
+    }
+  ],
+  "dashboard": {
+    "id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+    "name": "insuranceqa_overview",
+    "widgets": [
+      {
+        "id": "a519924e-6928-4497-93fc-80f0c498bc65",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Intent Prediction Accuracy",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 2,
+            "sizeY": 4,
+            "minSizeX": 1,
+            "maxSizeX": 6,
+            "minSizeY": 1,
+            "maxSizeY": 1000,
+            "col": 0,
+            "row": 0
+          }
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "3537476d-d940-4212-98b3-cf1a9a925ccb"
+      },
+      {
+        "id": "ff948f2e-38fd-4b8d-b800-8b37ba1f1322",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Last Questions",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 6,
+            "sizeY": 7,
+            "minSizeX": 2,
+            "maxSizeX": 6,
+            "minSizeY": 1,
+            "maxSizeY": 1000,
+            "col": 0,
+            "row": 19
+          }
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "0288f280-0d1f-47be-8ad1-c87334e31c15"
+      },
+      {
+        "id": "91489d24-f94f-4b1d-a207-914c0c2c12a4",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Prediction Accuracy per Topic (%)",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 3,
+            "sizeY": 8,
+            "minSizeX": 1,
+            "maxSizeX": 6,
+            "minSizeY": 5,
+            "maxSizeY": 1000,
+            "col": 0,
+            "row": 11
+          },
+          "overrideColors": false
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "52222049-8316-4691-b572-bbf25030038b"
+      },
+      {
+        "id": "e6430f02-14cd-4762-933b-7a6b8fd62a39",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Top Topic",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 2,
+            "sizeY": 4,
+            "minSizeX": 1,
+            "maxSizeX": 6,
+            "minSizeY": 1,
+            "maxSizeY": 1000,
+            "col": 2,
+            "row": 0
+          },
+          "overrideColors": false
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "dcb736f1-683d-4246-bf6e-caabd8f14946"
+      },
+      {
+        "id": "e6ea9b58-e0cb-4ef3-b1d1-6792d5520a8b",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Bottom Topic",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 2,
+            "sizeY": 4,
+            "minSizeX": 1,
+            "maxSizeX": 6,
+            "minSizeY": 1,
+            "maxSizeY": 1000,
+            "col": 4,
+            "row": 0
+          },
+          "overrideColors": false
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "5f79a88d-1b5a-48dc-98e7-8b0cf6ad5349"
+      },
+      {
+        "id": "5a485bdc-31b2-429a-b12d-586f28290bf6",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Topic Count",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 6,
+            "sizeY": 7,
+            "minSizeX": 2,
+            "maxSizeX": 6,
+            "minSizeY": 1,
+            "maxSizeY": 1000,
+            "col": 0,
+            "row": 4
+          }
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "0e7d4326-6688-4df5-aa5f-85295d366c96"
+      },
+      {
+        "id": "e53bfded-6c98-4fba-a6f3-0c1b2ba23c61",
+        "width": 1,
+        "options": {
+          "parameterMappings": {},
+          "title": "Bar 1 - topic_count",
+          "description": "",
+          "isHidden": false,
+          "position": {
+            "autoHeight": false,
+            "sizeX": 3,
+            "sizeY": 8,
+            "minSizeX": 1,
+            "maxSizeX": 6,
+            "minSizeY": 5,
+            "maxSizeY": 1000,
+            "col": 3,
+            "row": 11
+          }
+        },
+        "dashboard_id": "4c11293b-40f3-4593-9c04-29eb98a0e42d",
+        "text": "",
+        "visualization_id": "596869fb-1ac8-4933-b1d9-d65d75c6de0c"
+      }
+    ],
+    "tags": [],
+    "color_palette": null,
+    "dashboard_filters_enabled": false,
+    "parent": "folders/968903799810018",
+    "is_archived": false
+  },
+  "version": "1.0"
+}
