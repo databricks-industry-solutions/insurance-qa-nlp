@@ -3,23 +3,27 @@
 [![CLOUD](https://img.shields.io/badge/CLOUD-ALL-blue?logo=googlecloud&style=for-the-badge)](https://cloud.google.com/databricks)
 [![POC](https://img.shields.io/badge/POC-10_days-green?style=for-the-badge)](https://databricks.com/try-databricks)
 
-*Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.*
+While companies across industries have accelerated digital adoption, are insurers meeting the ever-changing demands from customers? As an insurer, are you spending most of your time and resources into creating business value?
+
+Customer service is a vital part of the insurance business, for multiple business cases, from marketing, to customer retention and claims. By digitalizing these processes, insurers can seamlessly scale their operations and shift money and resources from operational processes to actual product and value creation.
+
+This solutions accelerator is a head start on developing and deploying a machine learning solution to detect customer intents based on pieces of text from an Interactive Voice Response (IVR) stream or from a virtual agent.
+
+**Authors**
+
+* Rafael Piere ([rafael.pierre@databricks.com](mailto:rafael.pierre@databricks.com))
 
 ___
-<john.doe@databricks.com>
 
-___
+Copyright Databricks, Inc. [2022]. The source in this notebook is provided subject to the [Databricks License](https://databricks.com/db-license-source).  All included or referenced third party libraries are subject to the licenses set forth below.
 
-
-IMAGE TO REFERENCE ARCHITECTURE
-
-___
-
-&copy; 2022 Databricks, Inc. All rights reserved. The source in this notebook is provided subject to the Databricks License [https://databricks.com/db-license-source].  All included or referenced third party libraries are subject to the licenses set forth below.
-
-| library                                | description             | license    | source                                              |
-|----------------------------------------|-------------------------|------------|-----------------------------------------------------|
-| PyYAML                                 | Reading Yaml files      | MIT        | https://github.com/yaml/pyyaml                      |
+|Library Name|Library license | Library License URL | Library Source URL |
+|---|---|---|---|
+|PyTorch|BSD License| https://github.com/pytorch/pytorch/blob/master/LICENSE| https://github.com/pytorch/pytorch/|
+|PyTorch Lightning|Apache-2.0 License |https://github.com/Lightning-AI/lightning/blob/master/LICENSE|https://github.com/Lightning-AI/lightning/|
+|Python|Python Software Foundation (PSF) |https://github.com/python/cpython/blob/master/LICENSE|https://github.com/python/cpython|
+|Spark|Apache-2.0 License |https://github.com/apache/spark/blob/master/LICENSE|https://github.com/apache/spark|
+|Transformers|Apache 2.0|https://github.com/huggingface/transformers/blob/main/LICENSE|https://github.com/huggingface/transformers/|
 
 ## Getting started
 
