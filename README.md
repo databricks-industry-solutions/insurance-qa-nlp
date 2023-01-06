@@ -3,7 +3,8 @@
 [![CLOUD](https://img.shields.io/badge/CLOUD-ALL-blue?logo=googlecloud&style=for-the-badge)](https://cloud.google.com/databricks)
 [![POC](https://img.shields.io/badge/POC-10_days-green?style=for-the-badge)](https://databricks.com/try-databricks)
 
-### Insurance NLP Solution Accelerator
+## Insurance NLP Solution Accelerator
+### Digitalization of the Claims Process using NLP, Delta and Hugging Face
 
 <img src="https://raw.githubusercontent.com/rafaelvp-db/dbx-insurance-qa-hugging-face/master/img/header.png" width="100%"/>
 
@@ -15,7 +16,7 @@ This solutions accelerator is a head start on developing and deploying a machine
 
 ### Target Solution
 
-<img src="https://github.com/rafaelvp-db/dbx-insurance-qa-hugging-face/blob/master/img/Insurance(1).png?raw=true"
+<img src="https://github.com/rafaelvp-db/dbx-insurance-qa-hugging-face/blob/master/img/Insurance(1).png?raw=true" />
 
 ### Authors
 
