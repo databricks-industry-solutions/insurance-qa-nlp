@@ -20,7 +20,7 @@
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ### Looking the different intents in our dataset
+# MAGIC ### Looking at the different intents in our dataset
 
 # COMMAND ----------
 
@@ -83,6 +83,8 @@ def remove_outliers(df):
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Extracting the Lemmas from our Data
+# MAGIC 
+# MAGIC This step is **optional** - we don't need to [lemmatize](https://en.wikipedia.org/wiki/Lemmatisation) textual data prior to training it with Transformers models. However, doing so will allow us to generate some insightful visualizations.
 
 # COMMAND ----------
 
