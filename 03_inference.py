@@ -14,64 +14,47 @@
 
 # COMMAND ----------
 
-!pip install -q --upgrade pip && pip install -q transformers pytorch-lightning==1.8.6
-
-# COMMAND ----------
-
-from insuranceqa.datasets.insuranceqa import InsuranceDataset
-from insuranceqa.models.distilbert_insuranceqa import LitModel
+# DBTITLE 1,Getting best performing experiment runs
 import mlflow
-import pandas as pd
-from pyspark.sql.functions import pandas_udf, PandasUDFType, struct, col
-import torch
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
-model_info = mlflow.models.get_model_info("models:/distilbert_en_uncased_insuranceqa/latest")
-target_run_id = model_info.run_id
-print(f"Model run_id: {target_run_id}")
+user_name = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+experiment = mlflow.get_experiment_by_name(f"/Repos/{user_name}/insurance-qa-nlp/02_train")
 
-tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
-mlflow.artifacts.download_artifacts(
-  run_id = target_run_id,
-  artifact_path = "model/data",
-  dst_path = "/dbfs/tmp/"
+runs_df = mlflow.search_runs(
+  experiment_ids = [experiment.experiment_id],
+  order_by = ["metrics.eval_loss"],
+  filter_string = "status = 'FINISHED'",
 )
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-loaded_model = torch.load(
-  "/dbfs/tmp/model/data/model.pth",
-  map_location = torch.device(device)
-)
-
-loaded_model = sc.broadcast(loaded_model)
-tokenizer = sc.broadcast(tokenizer)
+target_run_id = runs_df.loc[0, "run_id"]
+runs_df.head()
 
 # COMMAND ----------
 
-from torch.utils.data import DataLoader
-import pytorch_lightning as pl
+# DBTITLE 1,Registering the best run as a model
+model_name = "insuranceqa"
+base_model = "distilbert-base-uncased"
 
-def predict(pdf):
-  
-  label_list = []
-  dataset = InsuranceDataset(questions = pdf.question_en.values)
-  dataloader = DataLoader(dataset, batch_size = 128, shuffle = False, num_workers = 4)
-  trainer = pl.Trainer(
-    accelerator = "gpu" if torch.cuda.is_available() else "cpu",
-    logger = False
-  )
-  with torch.no_grad():
-    pred = trainer.predict(model = loaded_model.value, dataloaders = [dataloader], return_predictions = True)
+model_info = mlflow.register_model(
+  model_uri = f"runs:/{target_run_id}/model",
+  name = "insuranceqa",
+  tags = {"base_model": base_model}
+)
 
-  pred_list = []
-  for item in pred:
-    for logit in item.logits:
-      pred_list.append(logit.argmax().item())
+# COMMAND ----------
 
-  pdf["pred"] = pred_list
+!ls {dst_path}/model
 
-  return pdf
+# COMMAND ----------
+
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
+
+dst_path = "/tmp/insuranceqa/"
+model_path = mlflow.artifacts.download_artifacts(f"runs:/{model_info.run_id}/model", dst_path = dst_path)
+
+tokenizer = AutoTokenizer.from_pretrained(base_model)
+config = AutoConfig.from_pretrained(base_model)
+model = AutoModelForSequenceClassification.from_pretrained(f"{model_path}/data", config = config)
 
 # COMMAND ----------
 
