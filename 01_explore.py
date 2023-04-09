@@ -140,7 +140,7 @@ display(dataset["train"].to_pandas())
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ## Deeper Dive Into Customer Questions
+# MAGIC ## [Optional] A Deeper Dive Into Customer Questions
 
 # COMMAND ----------
 

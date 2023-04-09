@@ -108,11 +108,12 @@ model = AutoModelForSequenceClassification.from_pretrained(
   base_model,
   num_labels = len(label2id),
   label2id = label2id,
-  id2label = id2label
+  id2label = dict(enumerate(id2label))
 )
 
 # COMMAND ----------
 
+# DBTITLE 1,Quick Glance at DistilBERT's Architecture
 model
 
 # COMMAND ----------
@@ -127,8 +128,6 @@ from transformers import (
   ProgressCallback
 )
 
-mlflow.end_run()
-
 # Here we define a DataCollator which combines different samples in the dataset and pads them to the same length
 data_collator = DataCollatorWithPadding(tokenizer)
 
@@ -142,9 +141,9 @@ training_args = TrainingArguments(
   output_dir = "/tmp/insurance_qa",
   evaluation_strategy = "steps",
   eval_steps = 100,
-  num_train_epochs = 10,
-  per_device_train_batch_size = 256,
-  per_device_eval_batch_size = 32,
+  num_train_epochs = 1,
+  per_device_train_batch_size = 296,
+  per_device_eval_batch_size = 64,
   load_best_model_at_end = True,
   learning_rate = 2e-5,
   weight_decay = 0.01
@@ -168,37 +167,49 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
   def load_context(self, context):
     device = 0 if torch.cuda.is_available() else -1
-    self.pipeline = pipeline("classification", context.artifacts["pipeline"], device = device)
+    pipeline_path = context.artifacts["insuranceqa_pipeline"]
+    model_path = context.artifacts["base_model"]
+    self.pipeline = pipeline("text-classification", model = context.artifacts["insuranceqa_pipeline"], config = context.artifacts["base_model"], device = device)
     
   def predict(self, context, model_input):
-    texts = model_input.iloc[:,0].to_list() # get the first column
-    pipe = self.pipeline(texts, truncation=True, batch_size = 8)
+
+    pipe = self.pipeline(model_input, truncation=True, batch_size = 8)
     labels = [label['label'] for label in pipe]
-    return pd.Series(labels)
+    return labels
 
 # COMMAND ----------
 
 from transformers import pipeline
 
-model_output_dir = "./insuranceqa_model"
-pipeline_output_dir = "./insuranceqa_pipeline"
+model_output_dir = "/tmp/insuranceqa_model"
+pipeline_output_dir = "/tmp/insuranceqa_pipeline/artifacts"
 model_artifact_path = "model"
+
+mlflow.end_run()
 
 with mlflow.start_run() as run:
   trainer.train()
   trainer.save_model(model_output_dir)
   pipe = pipeline(
     "text-classification",
-    model = AutoModelForSequenceClassification.from_pretrained(model_output_dir),
+    model = model,
+    config = model.config,
     batch_size = 8,
     tokenizer = tokenizer
   )
   pipe.save_pretrained(pipeline_output_dir)
   mlflow.pyfunc.log_model(
-    artifacts = {pipeline_artifact_name: pipeline_output_dir},
+    artifacts = {
+      pipeline_artifact_name: pipeline_output_dir,
+      "base_model": model_output_dir
+    },
     artifact_path = model_artifact_path,
-    python_model = InsuranceQAModel()
-  )
+    python_model = InsuranceQAModel(),
+    pip_requirements = [
+    "torch==1.13.1+cu117",
+    "transformers==4.26.1"
+  ]
+)
 
 # COMMAND ----------
 
@@ -210,3 +221,19 @@ with mlflow.start_run() as run:
 # MAGIC 
 # MAGIC * Given that we trained our model for 10 epochs and were able to achieve an *evaluation loss* metric of 0.04, we can say we're in a reasonably good place
 # MAGIC * We'll log our model artifact, so that later on we can use it for inference
+
+# COMMAND ----------
+
+import mlflow
+logged_model = 'runs:/d6f1d12be3864b379542c342a394885e/model'
+
+# Load model as a PyFuncModel.
+loaded_model = mlflow.pyfunc.load_model(logged_model)
+
+# COMMAND ----------
+
+loaded_model.predict("my car broke, what should I do?")
+
+# COMMAND ----------
+
+
