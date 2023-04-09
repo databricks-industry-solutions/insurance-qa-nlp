@@ -278,6 +278,7 @@ model_info = mlflow.pyfunc.log_model(
 
 # COMMAND ----------
 
+# DBTITLE 1,Fetching the best performing run and registering a model
 runs = mlflow.search_runs(
   order_by = ["metrics.eval_loss"],
   filter_string = "attributes.status = 'FINISHED'"
@@ -296,8 +297,13 @@ loaded_model = mlflow.pyfunc.load_model(logged_model_uri)
 
 # COMMAND ----------
 
+# DBTITLE 1,Test Prediction
 loaded_model.predict("my car broke, what should I do?")
 
 # COMMAND ----------
 
-
+# DBTITLE 1,Registering as a model
+mlflow.register_model(
+  model_uri = logged_model_uri,
+  name = "insuranceqa"
+)

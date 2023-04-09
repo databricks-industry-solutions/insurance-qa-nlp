@@ -14,47 +14,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Getting best performing experiment runs
+# DBTITLE 1,Getting the model's latest version
 import mlflow
+from mlflow.tracking import MlflowClient
 
-user_name = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
-experiment = mlflow.get_experiment_by_name(f"/Repos/{user_name}/insurance-qa-nlp/02_train")
-
-runs_df = mlflow.search_runs(
-  experiment_ids = [experiment.experiment_id],
-  order_by = ["metrics.eval_loss"],
-  filter_string = "status = 'FINISHED'",
-)
-
-target_run_id = runs_df.loc[0, "run_id"]
-runs_df.head()
-
-# COMMAND ----------
-
-# DBTITLE 1,Registering the best run as a model
-model_name = "insuranceqa"
-base_model = "distilbert-base-uncased"
-
-model_info = mlflow.register_model(
-  model_uri = f"runs:/{target_run_id}/model",
-  name = "insuranceqa",
-  tags = {"base_model": base_model}
-)
-
-# COMMAND ----------
-
-!ls {dst_path}/model
-
-# COMMAND ----------
-
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
-
-dst_path = "/tmp/insuranceqa/"
-model_path = mlflow.artifacts.download_artifacts(f"runs:/{model_info.run_id}/model", dst_path = dst_path)
-
-tokenizer = AutoTokenizer.from_pretrained(base_model)
-config = AutoConfig.from_pretrained(base_model)
-model = AutoModelForSequenceClassification.from_pretrained(f"{model_path}/data", config = config)
+client = MlflowClient()
+model_info = client.get_latest_versions(name = "insuranceqa")[0]
+model_info
 
 # COMMAND ----------
 
