@@ -118,7 +118,22 @@ model
 
 # COMMAND ----------
 
+from collections import Counter
+
+def get_inverse_weights(labels):
+
+  counter = Counter(labels)
+  item_count_dict = dict(counter.items())
+  size = len(labels)
+  weights = list({k: (size / v) for k, v in sorted(item_count_dict.items())}.values())
+  return weights
+
+weights = get_inverse_weights(dataset["train"]["label"])
+
+# COMMAND ----------
+
 import mlflow
+import itertools
 
 from transformers import (
   TrainingArguments,
@@ -141,15 +156,32 @@ training_args = TrainingArguments(
   output_dir = "/tmp/insurance_qa",
   evaluation_strategy = "steps",
   eval_steps = 100,
-  num_train_epochs = 1,
-  per_device_train_batch_size = 296,
-  per_device_eval_batch_size = 64,
+  num_train_epochs = 10,
+  per_device_train_batch_size = 264,
+  per_device_eval_batch_size = 56,
   load_best_model_at_end = True,
   learning_rate = 2e-5,
   weight_decay = 0.01
 )
 
-trainer = Trainer(
+class CustomTrainer(Trainer):
+  
+  def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+
+  def compute_loss(self, model, inputs, return_outputs=False):
+    labels = inputs.get("labels")
+    # forward pass
+    outputs = model(**inputs)
+    logits = outputs.get('logits')
+    # compute custom loss
+    device = 0 if torch.cuda.is_available() else -1
+    weights_tensor = torch.tensor(weights).to(device)
+    loss_fct = torch.nn.CrossEntropyLoss(weight = weights_tensor)
+    loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
+    return (loss, outputs) if return_outputs else loss
+
+trainer = CustomTrainer(
     model = model,
     args = training_args,
     train_dataset = tokenized_dataset["train"],
@@ -169,7 +201,12 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
     device = 0 if torch.cuda.is_available() else -1
     pipeline_path = context.artifacts["insuranceqa_pipeline"]
     model_path = context.artifacts["base_model"]
-    self.pipeline = pipeline("text-classification", model = context.artifacts["insuranceqa_pipeline"], config = context.artifacts["base_model"], device = device)
+    self.pipeline = pipeline(
+      "text-classification",
+      model = context.artifacts["insuranceqa_pipeline"],
+      config = context.artifacts["base_model"],
+      device = device
+    )
     
   def predict(self, context, model_input):
 
@@ -180,6 +217,7 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 # COMMAND ----------
 
 from transformers import pipeline
+import numpy as np
 
 model_output_dir = "/tmp/insuranceqa_model"
 pipeline_output_dir = "/tmp/insuranceqa_pipeline/artifacts"
@@ -200,7 +238,7 @@ with mlflow.start_run() as run:
   pipe.save_pretrained(pipeline_output_dir)
   mlflow.pyfunc.log_model(
     artifacts = {
-      pipeline_artifact_name: pipeline_output_dir,
+      "insuranceqa_pipeline": pipeline_output_dir,
       "base_model": model_output_dir
     },
     artifact_path = model_artifact_path,
@@ -213,22 +251,48 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
+model_info = mlflow.pyfunc.log_model(
+    artifacts = {
+      "insuranceqa_pipeline": pipeline_output_dir,
+      "base_model": model_output_dir
+    },
+    artifact_path = model_artifact_path,
+    python_model = InsuranceQAModel(),
+    pip_requirements = [
+    "torch==1.13.1+cu117",
+    "transformers==4.26.1"
+  ]
+)
+
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Initial Analysis
 # MAGIC 
 # MAGIC <hr />
 # MAGIC 
-# MAGIC * Given that we trained our model for 10 epochs and were able to achieve an *evaluation loss* metric of 0.04, we can say we're in a reasonably good place
-# MAGIC * We'll log our model artifact, so that later on we can use it for inference
+# MAGIC * We trained our text classification model for only one epoch, so we should expect it to have a suboptimal performance.
+# MAGIC * As a follow up action, we could increase the number of epochs - that would give the model more insights on different parts of our dataset, as well as different possible intents, thus increasing its ability to generalize.
 
 # COMMAND ----------
 
-import mlflow
-logged_model = 'runs:/d6f1d12be3864b379542c342a394885e/model'
+runs = mlflow.search_runs(
+  order_by = ["metrics.eval_loss"],
+  filter_string = "attributes.status = 'FINISHED'"
+)
+
+target_run_id = runs.loc[0, "run_id"]
+runs.loc[:5, :]
+
+# COMMAND ----------
+
+target_run_id = "9dc1dd4834e94ff1b2348d90571e5a32"
+logged_model_uri = f"runs:/{target_run_id}/model"
 
 # Load model as a PyFuncModel.
-loaded_model = mlflow.pyfunc.load_model(logged_model)
+loaded_model = mlflow.pyfunc.load_model(logged_model_uri)
 
 # COMMAND ----------
 
