@@ -20,7 +20,10 @@ from mlflow.tracking import MlflowClient
 import torch
 
 client = MlflowClient()
-model_info = [model for model in client.get_latest_versions(name = "insuranceqa") if model.current_stage not in ["Archived", "Production"]][0]
+model_info = [
+  model for model in client.get_latest_versions(name = "insuranceqa")
+  if model.current_stage not in ["Archived", "Production"]
+][0]
 pipeline = mlflow.pyfunc.load_model(f"models:/{model_info.name}/{model_info.version}")
 model_info
 
@@ -61,7 +64,6 @@ from pyspark.sql.types import StructType, StructField, StringType
 
 spark.conf.set("spark.sql.adaptive.enabled", False)
 spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-spark.conf.set("spark.sql.shuffle.partitions", 6)
 
 test_df = spark.sql("select question_en, topic_en from insuranceqa.questions")
 
@@ -72,11 +74,10 @@ test_df.count()
 test_df = test_df.cache()
 test_df.count()
 
-# Might want to increase number of partitions for higher degree of
-# parallelization
+# Uncomment & increase number of partitions for higher degree of parallelism
 
-test_df = test_df.repartition(4)
-test_df.count()
+#test_df = test_df.repartition(4)
+#test_df.count()
 
 predict_udf = F.pandas_udf(predict, returnType = StringType())
 
@@ -84,10 +85,6 @@ test_df = (
   test_df
     .withColumn("predicted", predict_udf(F.col("question_en")))
 )
-
-# COMMAND ----------
-
-display(test_df)
 
 # COMMAND ----------
 
@@ -102,17 +99,29 @@ display(test_df)
     )
 )
 
+predictions = spark.sql("select * from insuranceqa.predictions")
+display(predictions)
+
 # COMMAND ----------
 
 # DBTITLE 1,Calculating Performance Metrics
 # We calculate the amount of correct predictions and divide by the total number of predictions
 
-pred_df = spark.sql("select topic_en, predicted from insuranceqa.predictions")
-num_correct_predictions = pred_df.filter("topic_en = predicted").count()
-accuracy = num_correct_predictions / pred_df.count()
+import seaborn as sns
+from matplotlib import pyplot as plt
+%matplotlib inline
+%config InlineBackend.figure_format='retina'
 
-print(f"Accuracy score: {accuracy}")
+pred_df = predictions.toPandas()
+pred_df["hit"] = pd.to_numeric(pred_df["topic_en"] == pred_df["predicted"])
+accuracy_per_intent = pred_df.groupby("topic_en").hit.mean().reset_index()
 
-# COMMAND ----------
-
-
+fig, ax = plt.subplots(nrows = 1, ncols = 1, figsize = (4,4))
+plt.xticks(rotation = 45)
+sns.barplot(
+  y = accuracy_per_intent["topic_en"],
+  x = accuracy_per_intent["hit"],
+  palette = "mako",
+  ax = ax
+)
+plt.title("Prediction Accuracy per Intent")

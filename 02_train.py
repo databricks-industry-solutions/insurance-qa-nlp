@@ -37,7 +37,7 @@ sentiments = {
   "LABEL_1": "Negative"
 }
 
-sentence = "I'm happy today!"
+sentence = "I'm feeling wonderful!"
 inputs = tokenizer(sentence, return_tensors="pt")
 with torch.no_grad():
   outputs = model(**inputs, labels = torch.tensor(0))
@@ -120,7 +120,7 @@ model
 
 from collections import Counter
 
-def get_inverse_weights(labels):
+def get_class_weights(labels):
 
   counter = Counter(labels)
   item_count_dict = dict(counter.items())
@@ -128,7 +128,7 @@ def get_inverse_weights(labels):
   weights = list({k: (size / v) for k, v in sorted(item_count_dict.items())}.values())
   return weights
 
-weights = get_inverse_weights(dataset["train"]["label"])
+weights = get_class_weights(dataset["train"]["label"])
 
 # COMMAND ----------
 
@@ -156,7 +156,7 @@ training_args = TrainingArguments(
   output_dir = "/tmp/insurance_qa",
   evaluation_strategy = "steps",
   eval_steps = 100,
-  num_train_epochs = 1,
+  num_train_epochs = 1, # Increase for better accuracy
   per_device_train_batch_size = 264,
   per_device_eval_batch_size = 56,
   load_best_model_at_end = True,
@@ -213,16 +213,16 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
   def predict(self, context, model_input):
     try:
       logging.info(f"Model input: {model_input}")
-      question = model_input
-      if isinstance(model_input, dict):
-        question = model_input["text"]
+      questions = list(model_input)
 
-      pipe = self.pipeline(question, truncation = True, batch_size = 8)
-      labels = [label['label'] for label in pipe]
+      results = self.pipeline(questions, truncation = True, batch_size = 8)
+      labels = [result["label"] for result in results]
+      logging.info(f"Model output: {labels}")
       return labels
+
     except Exception as exception:
-      logging.error(f"Model input: {model_input}")
-      logging.error(f"Error: {str(exception)}")
+      logging.error(f"Model input: {questions}, type: {str(type(questions))}")
+      return {"error": str(exception)}
 
 # COMMAND ----------
 
@@ -246,6 +246,8 @@ with mlflow.start_run() as run:
     tokenizer = tokenizer
   )
   pipe.save_pretrained(pipeline_output_dir)
+
+  # Log custom PyFunc model
   mlflow.pyfunc.log_model(
     artifacts = {
       "insuranceqa_pipeline": pipeline_output_dir,
@@ -254,10 +256,10 @@ with mlflow.start_run() as run:
     artifact_path = model_artifact_path,
     python_model = InsuranceQAModel(),
     pip_requirements = [
-    "torch==1.13.1",
-    "transformers==4.26.1"
-  ]
-)
+      "torch==1.13.1",
+      "transformers==4.26.1"
+    ]
+  )
 
 # COMMAND ----------
 
@@ -274,20 +276,19 @@ with mlflow.start_run() as run:
 
 # DBTITLE 1,Fetching the best performing run and registering a model
 runs = mlflow.search_runs(
-  order_by = ["start_time"],
+  order_by = ["start_time DESC"],
   filter_string = "attributes.status = 'FINISHED'"
 )
 
 target_run_id = runs.loc[0, "run_id"]
 logged_model_uri = f"runs:/{target_run_id}/model"
-runs.loc[:5, :]
+loaded_model = mlflow.pyfunc.load_model(logged_model_uri)
+loaded_model
 
 # COMMAND ----------
 
-# DBTITLE 1,Load PyFunc Model and Run test prediction
-# Load model as a PyFuncModel.
-loaded_model = mlflow.pyfunc.load_model(logged_model_uri)
-loaded_model.predict([{"text": "my car broke, what should I do?"}])
+# DBTITLE 1,Run test prediction
+loaded_model.predict(["my car broke, what should I do?"])
 
 # COMMAND ----------
 

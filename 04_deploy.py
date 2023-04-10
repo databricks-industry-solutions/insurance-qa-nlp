@@ -102,9 +102,14 @@ def check_endpoint_status(endpoint_name: str, max_retries: int = 300, interval: 
       f"{databricks_url}/{api_endpoint}",
       headers = headers
     ).json()
-    endpoint_status = [endpoint for endpoint in response_json["endpoints"] if endpoint["name"] == endpoint_name][0]
-    if (endpoint_status["state"]["config_update"] == "IN_PROGRESS"):
-      print(f"Attempt {current_tries} of {max_retries}: {endpoint_status['state']}")
+    endpoint_status = [
+      endpoint for endpoint
+      in response_json["endpoints"]
+      if endpoint["name"] == endpoint_name
+    ][0]
+    current_state = endpoint_status["state"]["config_update"]
+    if (current_state == "IN_PROGRESS"):
+      print(f"Checking model deployment status, attempt {current_tries} of {max_retries} - current state: {current_state}")
     else:
       print(f"Model endpoint deployment result: {endpoint_status}")
       break
@@ -117,11 +122,9 @@ check_endpoint_status(endpoint_name = endpoint_name)
 
 # DBTITLE 1,Querying the endpoint through REST API
 
-def test_prediction_endpoint(question):
+def test_prediction_endpoint(questions):
   endpoint_url = f"serving-endpoints/{endpoint_name}/invocations"
-  payload = {
-    "inputs": {"text": question}
-  }
+  payload = {"instances": questions}
   
   data_json = json.dumps(payload)
   print(data_json)
@@ -136,8 +139,4 @@ def test_prediction_endpoint(question):
     raise Exception(f'Request failed with status {response.status_code}, {response.text}')
   return response.json()
 
-test_prediction_endpoint("what is my life insurance coverage?")
-
-# COMMAND ----------
-
-
+test_prediction_endpoint(["what is my life insurance coverage?"])
