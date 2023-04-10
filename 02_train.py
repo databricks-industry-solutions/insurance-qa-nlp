@@ -312,11 +312,3 @@ model_name = "insuranceqa"
 
 # Register the model
 model_details = mlflow.register_model(logged_model_uri, model_name)
-
-# Transition the model to "Production" stage in the registry
-client.transition_model_version_stage(
-  name = model_name,
-  version = model_details.version,
-  stage="Production",
-  archive_existing_versions=True
-)
