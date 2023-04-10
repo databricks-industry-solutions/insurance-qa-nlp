@@ -56,6 +56,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install datasets
+
+# COMMAND ----------
+
 # DBTITLE 1,Downloading the Insurance QA Dataset
 from datasets import load_dataset
 
@@ -107,10 +111,8 @@ names = list(set(clean_dataset["train"]["label"]))
 clean_dataset = clean_dataset.cast_column("label", ClassLabel(names = names))
 
 # Save to cleaned dataset for further training
-
-clean_dataset.save_to_disk("/tmp/insurance")
-dbutils.fs.rm("/dbfs/tmp/insurance", recurse = True)
-dbutils.fs.cp("file:///tmp/insurance", "dbfs:/tmp/insurance", recurse = True)
+dbutils.fs.rm("dbfs:/tmp/insurance", True)
+clean_dataset.save_to_disk("/dbfs/tmp/insurance") # You can write to dbfs locations via the /dbfs mount
 
 # COMMAND ----------
 
@@ -142,6 +144,7 @@ display(dataset["train"].to_pandas())
 
 # DBTITLE 1,Saving the test set into Delta for inference
 test_df = spark.createDataFrame(dataset["test"].to_pandas())
+spark.sql("create database if not exists insuranceqa")
 test_df.write.saveAsTable("insuranceqa.questions", mode = "overwrite")
 
 # COMMAND ----------

@@ -46,11 +46,6 @@ job_json = {
                     "notebook_path": f"00_README"
                 },
                 "task_key": "ins_qa_00",
-                "libraries": {
-                    "pypi": {
-                        "package": "datasets"
-                    }
-                }
             },
             {
                 "job_cluster_key": "ins_qa_cluster",
@@ -58,11 +53,6 @@ job_json = {
                     "notebook_path": f"01_explore"
                 },
                 "task_key": "ins_qa_01",
-                "libraries": {
-                    "pypi": {
-                        "package": "datasets"
-                    }
-                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_00"
@@ -75,11 +65,6 @@ job_json = {
                     "notebook_path": f"02_train"
                 },
                 "task_key": "ins_qa_02",
-                "libraries": {
-                    "pypi": {
-                        "package": "datasets"
-                    }
-                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_01"
@@ -92,11 +77,6 @@ job_json = {
                     "notebook_path": f"03_inference"
                 },
                 "task_key": "ins_qa_03",
-                "libraries": {
-                    "pypi": {
-                        "package": "datasets"
-                    }
-                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_02"
@@ -109,11 +89,6 @@ job_json = {
                     "notebook_path": f"04_deploy"
                 },
                 "task_key": "ins_qa_04",
-                "libraries": {
-                    "pypi": {
-                        "package": "datasets"
-                    }
-                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_03"

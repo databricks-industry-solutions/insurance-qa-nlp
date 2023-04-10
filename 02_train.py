@@ -25,6 +25,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install datasets
+
+# COMMAND ----------
+
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
@@ -73,8 +77,10 @@ outputs
 
 import datasets
 
-dbutils.fs.rm("file:///tmp/insurance", recurse = True)
-dbutils.fs.cp("dbfs:/tmp/insurance", "file:///tmp/insurance", recurse = True)
+# We cannot reload a dataset from the /dbfs path we saved it to. So we must copy it to a local file path
+# initialize the local path where we copy and reload the dataset 
+dbutils.fs.rm("file:/tmp/insurance", recurse = True) 
+dbutils.fs.cp("dbfs:/tmp/insurance", "file:/tmp/insurance", recurse = True)
 dataset = datasets.load_from_disk("/tmp/insurance")
 
 # COMMAND ----------
@@ -304,26 +310,13 @@ client = MlflowClient()
 
 model_name = "insuranceqa"
 
-def remove_existing_model(model_name: str):
-  """Archives all model versions for a particular model, and removes it from registry"""
+# Register the model
+model_details = mlflow.register_model(logged_model_uri, model_name)
 
-  model_info = client.get_registered_model(model_name)
-  latest_versions = [int(model.version) for model in client.get_latest_versions(model_name)]
-  latest_version = max(latest_versions)
-
-  for version in range(0, latest_version):
-    model_version = client.get_model_version(model_name, version + 1)
-    current_stage = model_version.current_stage
-    if current_stage not in ["None", "Archived"]:
-      client.transition_model_version_stage(model_name, version = model_version.version, stage = "Archived")
-  
-  client.delete_registered_model(model_name)
-
-# IMPORTANT: Comment the line below if not testing
-remove_existing_model(model_name)
-
-# Register (or re-register) model
-mlflow.register_model(
-  model_uri = logged_model_uri,
-  name = model_name
+# Transition the model to "Production" stage in the registry
+client.transition_model_version_stage(
+  name = model_name,
+  version = model_details.version,
+  stage="Production",
+  archive_existing_versions=True
 )

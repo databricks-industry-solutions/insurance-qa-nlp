@@ -14,6 +14,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install datasets
+
+# COMMAND ----------
+
 # DBTITLE 1,Getting the model's latest version
 import mlflow
 from mlflow.tracking import MlflowClient
