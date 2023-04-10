@@ -73,6 +73,8 @@ outputs
 
 import datasets
 
+dbutils.fs.rm("file:///tmp/insurance", recurse = True)
+dbutils.fs.cp("dbfs:/tmp/insurance", "file:///tmp/insurance", recurse = True)
 dataset = datasets.load_from_disk("/tmp/insurance")
 
 # COMMAND ----------
@@ -152,6 +154,9 @@ early_stopping = EarlyStoppingCallback(
   early_stopping_threshold = 0.01
 )
 
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+model.to(torch.device(device))
+
 training_args = TrainingArguments(
   output_dir = "/tmp/insurance_qa",
   evaluation_strategy = "steps",
@@ -161,7 +166,9 @@ training_args = TrainingArguments(
   per_device_eval_batch_size = 56,
   load_best_model_at_end = True,
   learning_rate = 2e-5,
-  weight_decay = 0.01
+  weight_decay = 0.01,
+  xpu_backend = "ccl",
+  no_cuda = False if torch.cuda.is_available() else True
 )
 
 class CustomTrainer(Trainer):

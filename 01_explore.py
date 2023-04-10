@@ -109,6 +109,8 @@ clean_dataset = clean_dataset.cast_column("label", ClassLabel(names = names))
 # Save to cleaned dataset for further training
 
 clean_dataset.save_to_disk("/tmp/insurance")
+dbutils.fs.rm("/dbfs/tmp/insurance", recurse = True)
+dbutils.fs.cp("file:///tmp/insurance", "dbfs:/tmp/insurance", recurse = True)
 
 # COMMAND ----------
 
@@ -140,99 +142,7 @@ display(dataset["train"].to_pandas())
 
 # DBTITLE 1,Saving the test set into Delta for inference
 test_df = spark.createDataFrame(dataset["test"].to_pandas())
-test_df.write.saveAsTable("insuranceqa.questions")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC 
-# MAGIC ## [Optional] A Deeper Dive Into Customer Questions
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC 
-# MAGIC * We are now able to get an idea about how question intents are distributed across our training set, which has been previously labelled by specialized professionals. What about when we are looking at data which hasn't been labelled yet?
-# MAGIC * In this case, we need to resort to an unsupervised, no-labels approach.
-# MAGIC * For this exercise, we will assume that we still don't have the labels for questions which are part of the dataset. We will then analyse the raw text for questions from the testing set, and by using BERT Embeddings, we will try to have an idea about which topics are more common in our testing set.
-# MAGIC * **BERTopic** is a Python library which leverages BERT embeddings for performing unsupervised topic modelling. By using it, we can group our text data into different clusters, and also visually inspect them.
-
-# COMMAND ----------
-
-!pip install -q bertopic
-
-# COMMAND ----------
-
-from bertopic import BERTopic
-
-docs = dataset["test"].to_pandas().question_en.values
-topic_model = BERTopic()
-topics, probs = topic_model.fit_transform(docs)
-
-# COMMAND ----------
-
-# Visualizing topics
-
-topic_model.get_topic_info().head(10)
-
-# COMMAND ----------
-
-# Looking at how many topics
-
-topic_model.get_topic_info().Name.unique()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC 
-# MAGIC Interesting to see that according to our model which uses BERT Embeddings, we have 32 different topics in our testing set. This is higher than the amount of classifications that we have in our training set - potentially, our list of unsupervised topics is a bit more fine grained than the topics that we are using in our training set.
-# MAGIC 
-# MAGIC Nevertheless, would be great to have a closer look at how these topics are distributed, and some examples of questions which are part of each of them. The great news is that BERTopic has a function to easily achieve that:
-
-# COMMAND ----------
-
-topic_model.visualize_topics()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC 
-# MAGIC * The visualization above shows us an *Intertopic Distance Map*, a visualization of the topics in a two-dimensional space . The radius of the topic circles is proportional to the amount of words that belong to each topic in our document.
-# MAGIC * Ideally, intertopic distance across similar topics should be low, and the opposite should be true for topics which have differ in meaning or semantics.
-# MAGIC * While the visualization above is helpful, visually inspecting examples of our questions and how they relate to each other in terms of topic clusters will help us understand our data even more. In order to do that, we will leverage two additional libraries: [Sentence Transformers](https://www.sbert.net/) and [UMap](https://umap-learn.readthedocs.io/en/latest/).
-
-# COMMAND ----------
-
-!pip install -q umap-learn sentence-transformers
-
-# COMMAND ----------
-
-from sentence_transformers import SentenceTransformer
-from bertopic import BERTopic
-from umap import UMAP
-
-# Prepare embeddings
-sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
-embeddings = sentence_model.encode(docs, show_progress_bar=False)
-
-# Train BERTopic
-topic_model = BERTopic().fit(docs, embeddings)
-
-# Run the visualization with the original embeddings
-topic_model.visualize_documents(docs, embeddings=embeddings)
-
-# Reduce dimensionality of embeddings, this step is optional but much faster to perform iteratively:
-reduced_embeddings = UMAP(n_neighbors=10, n_components=2, min_dist=0.0, metric='cosine').fit_transform(embeddings)
-topic_model.visualize_documents(docs, reduced_embeddings=reduced_embeddings)
-
-# COMMAND ----------
-
-# DBTITLE 1,Topic Modeling Takeaways
-# MAGIC %md
-# MAGIC 
-# MAGIC * The visualization above is interactive, which allows us to zoom in different topic clusters.
-# MAGIC * For instance, if we look at the cluster at the center of this plot, we can notice that there multiple occurrencies of topics related to life insurance.
-# MAGIC * We can also hover across different points across the same color/cluster; that will give us the chance to look at sample data points that were included in that particular cluster.
+test_df.write.saveAsTable("insuranceqa.questions", mode = "overwrite")
 
 # COMMAND ----------
 

@@ -70,7 +70,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster",
+                "job_cluster_key": "ins_qa_cluster_train",
                 "notebook_task": {
                     "notebook_path": f"02_train"
                 },
@@ -136,6 +136,20 @@ job_json = {
                     },
                 }
             },
+            {
+                "job_cluster_key": "ins_qa_cluster_train",
+                "new_cluster": {
+                    "spark_version": "13.0.x-gpu-ml-scala2.12",
+                "spark_conf": {
+                    "spark.databricks.delta.formatCheck.enabled": "false"
+                    },
+                    "num_workers": 1,
+                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_NC6s_v3", "GCP": "a2-highgpu-1g"},
+                    "custom_tags": {
+                        "usage": "solacc_testing"
+                    },
+                }
+            }
         ]
     }
 
@@ -150,7 +164,3 @@ test_json = json.dumps(job_json)
 dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 NotebookSolutionCompanion().deploy_compute(job_json, run_job=run_job)
-
-# COMMAND ----------
-
-
