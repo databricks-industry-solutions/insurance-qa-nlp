@@ -202,7 +202,6 @@ trainer = CustomTrainer(
 # DBTITLE 1,Train Model and Save Artifacts
 from transformers import pipeline
 import logging
-import mlflow
 
 class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
@@ -240,7 +239,7 @@ model_output_dir = "/tmp/insuranceqa_model"
 pipeline_output_dir = "/tmp/insuranceqa_pipeline/artifacts"
 model_artifact_path = "model"
 
-mlflow.end_run()
+mlflow.set_experiment(experiment_name = "/Shared/insuranceqa_distilbert")
 
 with mlflow.start_run() as run:
   trainer.train()
@@ -300,7 +299,31 @@ loaded_model.predict(["my car broke, what should I do?"])
 # COMMAND ----------
 
 # DBTITLE 1,Registering the model
+from mlflow.tracking import MlflowClient
+client = MlflowClient()
+
+model_name = "insuranceqa"
+
+def remove_existing_model(model_name: str):
+  """Archives all model versions for a particular model, and removes it from registry"""
+
+  model_info = client.get_registered_model(model_name)
+  latest_versions = [int(model.version) for model in client.get_latest_versions(model_name)]
+  latest_version = max(latest_versions)
+
+  for version in range(0, latest_version):
+    model_version = client.get_model_version(model_name, version + 1)
+    current_stage = model_version.current_stage
+    if current_stage not in ["None", "Archived"]:
+      client.transition_model_version_stage(model_name, version = model_version.version, stage = "Archived")
+  
+  client.delete_registered_model(model_name)
+
+# IMPORTANT: Comment the line below if not testing
+remove_existing_model(model_name)
+
+# Register (or re-register) model
 mlflow.register_model(
   model_uri = logged_model_uri,
-  name = "insuranceqa"
+  name = model_name
 )
