@@ -156,7 +156,7 @@ training_args = TrainingArguments(
   output_dir = "/tmp/insurance_qa",
   evaluation_strategy = "steps",
   eval_steps = 100,
-  num_train_epochs = 10,
+  num_train_epochs = 1,
   per_device_train_batch_size = 264,
   per_device_eval_batch_size = 56,
   load_best_model_at_end = True,
@@ -194,6 +194,8 @@ trainer = CustomTrainer(
 
 # DBTITLE 1,Train Model and Save Artifacts
 from transformers import pipeline
+import logging
+import mlflow
 
 class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
@@ -209,10 +211,18 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
     )
     
   def predict(self, context, model_input):
+    try:
+      logging.info(f"Model input: {model_input}")
+      question = model_input
+      if isinstance(model_input, dict):
+        question = model_input["text"]
 
-    pipe = self.pipeline(model_input, truncation=True, batch_size = 8)
-    labels = [label['label'] for label in pipe]
-    return labels
+      pipe = self.pipeline(question, truncation = True, batch_size = 8)
+      labels = [label['label'] for label in pipe]
+      return labels
+    except Exception as exception:
+      logging.error(f"Model input: {model_input}")
+      logging.error(f"Error: {str(exception)}")
 
 # COMMAND ----------
 
@@ -244,26 +254,10 @@ with mlflow.start_run() as run:
     artifact_path = model_artifact_path,
     python_model = InsuranceQAModel(),
     pip_requirements = [
-    "torch==1.13.1+cu117",
+    "torch==1.13.1",
     "transformers==4.26.1"
   ]
 )
-
-# COMMAND ----------
-
-model_info = mlflow.pyfunc.log_model(
-    artifacts = {
-      "insuranceqa_pipeline": pipeline_output_dir,
-      "base_model": model_output_dir
-    },
-    artifact_path = model_artifact_path,
-    python_model = InsuranceQAModel(),
-    pip_requirements = [
-    "torch==1.13.1+cu117",
-    "transformers==4.26.1"
-  ]
-)
-
 
 # COMMAND ----------
 
@@ -280,29 +274,24 @@ model_info = mlflow.pyfunc.log_model(
 
 # DBTITLE 1,Fetching the best performing run and registering a model
 runs = mlflow.search_runs(
-  order_by = ["metrics.eval_loss"],
+  order_by = ["start_time"],
   filter_string = "attributes.status = 'FINISHED'"
 )
 
 target_run_id = runs.loc[0, "run_id"]
+logged_model_uri = f"runs:/{target_run_id}/model"
 runs.loc[:5, :]
 
 # COMMAND ----------
 
-target_run_id = "9dc1dd4834e94ff1b2348d90571e5a32"
-logged_model_uri = f"runs:/{target_run_id}/model"
-
+# DBTITLE 1,Load PyFunc Model and Run test prediction
 # Load model as a PyFuncModel.
 loaded_model = mlflow.pyfunc.load_model(logged_model_uri)
+loaded_model.predict([{"text": "my car broke, what should I do?"}])
 
 # COMMAND ----------
 
-# DBTITLE 1,Test Prediction
-loaded_model.predict("my car broke, what should I do?")
-
-# COMMAND ----------
-
-# DBTITLE 1,Registering as a model
+# DBTITLE 1,Registering the model
 mlflow.register_model(
   model_uri = logged_model_uri,
   name = "insuranceqa"

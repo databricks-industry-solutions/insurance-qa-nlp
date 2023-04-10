@@ -138,6 +138,12 @@ display(dataset["train"].to_pandas())
 
 # COMMAND ----------
 
+# DBTITLE 1,Saving the test set into Delta for inference
+test_df = spark.createDataFrame(dataset["test"].to_pandas())
+test_df.write.saveAsTable("insuranceqa.questions")
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC ## [Optional] A Deeper Dive Into Customer Questions
