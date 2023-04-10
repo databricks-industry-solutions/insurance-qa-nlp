@@ -45,14 +45,24 @@ job_json = {
                 "notebook_task": {
                     "notebook_path": f"00_README"
                 },
-                "task_key": "ins_qa_00"
+                "task_key": "ins_qa_00",
+                "libraries": {
+                    "pypi": {
+                        "package": "datasets"
+                    }
+                }
             },
             {
                 "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"01_ingest"
+                    "notebook_path": f"01_explore"
                 },
                 "task_key": "ins_qa_01",
+                "libraries": {
+                    "pypi": {
+                        "package": "datasets"
+                    }
+                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_00"
@@ -62,9 +72,14 @@ job_json = {
             {
                 "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"02_explore_and_clean"
+                    "notebook_path": f"02_train"
                 },
                 "task_key": "ins_qa_02",
+                "libraries": {
+                    "pypi": {
+                        "package": "datasets"
+                    }
+                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_01"
@@ -72,11 +87,16 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "ins_qa_cluster_train",
+                "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"03_train"
+                    "notebook_path": f"03_inference"
                 },
                 "task_key": "ins_qa_03",
+                "libraries": {
+                    "pypi": {
+                        "package": "datasets"
+                    }
+                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_02"
@@ -86,26 +106,14 @@ job_json = {
             {
                 "job_cluster_key": "ins_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"04_inference"
+                    "notebook_path": f"04_deploy"
                 },
                 "task_key": "ins_qa_04",
-                "libraries": [
-                  {
-                      "pypi": {
-                          "package": "pytorch-lightning==1.8.6"
-                      }
-                  },
-                  {
-                      "pypi": {
-                          "package": "transformers"
-                      }
-                  },
-                  {
-                      "pypi": {
-                          "package": "tensorflow"
-                      }
-                  }
-                ], 
+                "libraries": {
+                    "pypi": {
+                        "package": "datasets"
+                    }
+                },
                 "depends_on": [
                     {
                         "task_key": "ins_qa_03"
@@ -117,7 +125,7 @@ job_json = {
             {
                 "job_cluster_key": "ins_qa_cluster",
                 "new_cluster": {
-                    "spark_version": "12.0.x-cpu-ml-scala2.12",
+                    "spark_version": "13.0.x-cpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
@@ -128,22 +136,14 @@ job_json = {
                     },
                 }
             },
-            {
-                "job_cluster_key": "ins_qa_cluster_train",
-                "new_cluster": {
-                    "spark_version": "12.0.x-gpu-ml-scala2.12",
-                    "spark_conf": {
-                        "spark.databricks.delta.formatCheck.enabled": "false",
-                        },
-                    "num_workers": 1,
-                    "node_type_id": {"AWS": "g4dn.xlarge", "MSA": "Standard_DS3_v2", "GCP": "a2-highgpu-1g"},
-                    "custom_tags": {
-                        "usage": "solacc_testing"
-                    } 
-                  }
-            }
         ]
     }
+
+# COMMAND ----------
+
+import json
+
+test_json = json.dumps(job_json)
 
 # COMMAND ----------
 
