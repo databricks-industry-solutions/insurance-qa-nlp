@@ -92,7 +92,7 @@ create_endpoint(endpoint_name = endpoint_name, model_name = model_info.name, mod
 import time
 from IPython.display import clear_output
 
-def check_endpoint_status(endpoint_name: str, max_retries: int = 300, interval: int = 5):
+def check_endpoint_status(endpoint_name: str, max_retries: int = 1000, interval: int = 5):
 
   current_tries = 0
 
