@@ -25,7 +25,6 @@
 
 # COMMAND ----------
 
-import torch
 from transformers import pipeline
 
 pipe = pipeline("text-classification")
@@ -48,15 +47,29 @@ pipe(["This restaurant is awesome", "This restaurant is awful"])
 
 # COMMAND ----------
 
+# MAGIC %pip install datasets
+
+# COMMAND ----------
+
+# MAGIC %run ./config/notebook-config
+
+# COMMAND ----------
+
 import datasets
 
-dbutils.fs.rm("file:///tmp/insurance", recurse = True)
-dbutils.fs.cp("dbfs:/tmp/insurance", "file:///tmp/insurance", recurse = True)
-dataset = datasets.load_from_disk("/tmp/insurance")
+local_path = "/tmp/insurance"
+dbutils.fs.rm(f"file://{local_path}", recurse = True)
+dbutils.fs.cp(config["main_path_w_dbfs"], f"file://{local_path}", recurse = True)
+dataset = datasets.load_from_disk(local_path)
 
 # COMMAND ----------
 
 # DBTITLE 1,Dataset Tokenization
+from transformers import AutoTokenizer
+
+base_model = "distilbert-base-uncased"
+tokenizer = AutoTokenizer.from_pretrained(base_model)
+
 def tokenize(examples):
   return tokenizer(examples["text"], padding = True, truncation = True, return_tensors = "pt")
 
@@ -77,6 +90,7 @@ tokenized_dataset = dataset.map(tokenize, batched = True)
 
 # COMMAND ----------
 
+from transformers import AutoModelForSequenceClassification
 import datasets
 
 dataset = datasets.load_from_disk("/dbfs/tmp/insurance")
@@ -126,6 +140,7 @@ weights = get_class_weights(dataset["train"]["label"])
 
 import mlflow
 import itertools
+import torch
 
 from transformers import (
   TrainingArguments,
@@ -152,8 +167,8 @@ training_args = TrainingArguments(
   evaluation_strategy = "steps",
   eval_steps = 100,
   num_train_epochs = 1, # Increase for better accuracy
-  per_device_train_batch_size = 264,
-  per_device_eval_batch_size = 56,
+  per_device_train_batch_size = 128,
+  per_device_eval_batch_size = 128,
   load_best_model_at_end = True,
   learning_rate = 2e-5,
   weight_decay = 0.01,
@@ -223,6 +238,7 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 # COMMAND ----------
 
 from transformers import pipeline
+import transformers
 import numpy as np
 
 model_output_dir = "/tmp/insuranceqa_model"
@@ -252,8 +268,8 @@ with mlflow.start_run() as run:
     artifact_path = model_artifact_path,
     python_model = InsuranceQAModel(),
     pip_requirements = [
-      "torch==1.13.1",
-      "transformers==4.26.1"
+      f"""torch=={torch.__version__.split("+")[0]}""",
+      f"""transformers=={transformers.__version__}"""
     ]
   )
 

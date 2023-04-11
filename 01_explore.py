@@ -88,6 +88,10 @@ display(dataset["train"].to_pandas().loc[:10, ["question_en", "topic_en"]])
 
 # COMMAND ----------
 
+!ls /tmp/insuranceqa
+
+# COMMAND ----------
+
 # DBTITLE 1,Basic Cleaning
 # Let's convert everything to lower case and remove extra spaces
 
@@ -115,8 +119,10 @@ names = list(set(clean_dataset["train"]["label"]))
 clean_dataset = clean_dataset.cast_column("label", ClassLabel(names = names))
 
 # Save to cleaned dataset for further training
+local_path = "/tmp/insuranceqa"
 dbutils.fs.rm(config["main_path"], True)
-clean_dataset.save_to_disk(config["main_path_w_dbfs"]) # You can write to the same dbfs locations via the /dbfs mount as if it is a local path
+clean_dataset.save_to_disk(local_path)
+dbutils.fs.cp(f"file:///{local_path}", config["main_path"], recurse = True)
 
 # COMMAND ----------
 
