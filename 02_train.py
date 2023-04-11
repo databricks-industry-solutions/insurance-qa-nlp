@@ -242,6 +242,7 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
+import transformers
 from transformers import pipeline
 import numpy as np
 
