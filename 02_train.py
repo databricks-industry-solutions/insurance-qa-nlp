@@ -20,47 +20,16 @@
 # MAGIC 
 # MAGIC <hr />
 # MAGIC 
-# MAGIC * In the cell below, we simply download a pre-trained, distilled bersion of BERT (`distilbert-base-uncased`) to see how it works.
+# MAGIC * In the cell below, we simply instantiate a Hugging Face Text Classification Pipeline to see how it works.
 # MAGIC * We go on and run a sample prediction for a piece of text
 
 # COMMAND ----------
 
-# MAGIC %pip install datasets
-
-# COMMAND ----------
-
-# MAGIC %run ./config/notebook-config
-
-# COMMAND ----------
-
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import pipeline
 
-base_model = "distilbert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(base_model)
-model = AutoModelForSequenceClassification.from_pretrained(base_model)
-
-sentiments = {
-  "LABEL_0": "Positive",
-  "LABEL_1": "Negative"
-}
-
-sentence = "I'm feeling wonderful!"
-inputs = tokenizer(sentence, return_tensors="pt")
-with torch.no_grad():
-  outputs = model(**inputs, labels = torch.tensor(0))
-  logits = outputs.logits
-  loss = outputs.loss
-
-predicted_class_id = logits.argmax().item()
-label = model.config.id2label[predicted_class_id]
-sentiment = sentiments[label]
-
-print("\n****************************************************************************************")
-print(f"Sentiment for the sentence: '{sentence}' was classified as {label} / {sentiment}")
-print("****************************************************************************************")
-
-outputs
+pipe = pipeline("text-classification")
+pipe(["This restaurant is awesome", "This restaurant is awful"])
 
 # COMMAND ----------
 
@@ -81,14 +50,9 @@ outputs
 
 import datasets
 
-# We cannot reload a dataset from the /dbfs path we saved it to. So we must copy it to a local file path
-# initialize the local path where we copy and reload the dataset 
-dbutils.fs.rm(config["main_local_path"], recurse = True) 
-dbutils.fs.cp(config["main_path"], config["main_local_path"], recurse = True)
-
-# get the path from `file:/....`
-local_path = config["main_local_path"].split(":")[-1]
-dataset = datasets.load_from_disk(local_path) 
+dbutils.fs.rm("file:///tmp/insurance", recurse = True)
+dbutils.fs.cp("dbfs:/tmp/insurance", "file:///tmp/insurance", recurse = True)
+dataset = datasets.load_from_disk("/tmp/insurance")
 
 # COMMAND ----------
 
@@ -113,6 +77,9 @@ tokenized_dataset = dataset.map(tokenize, batched = True)
 
 # COMMAND ----------
 
+import datasets
+
+dataset = datasets.load_from_disk("/dbfs/tmp/insurance")
 label2id = dataset["train"].features["label"]._str2int
 id2label = dataset["train"].features["label"]._int2str
 
@@ -127,6 +94,19 @@ model = AutoModelForSequenceClassification.from_pretrained(
 
 # DBTITLE 1,Quick Glance at DistilBERT's Architecture
 model
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Defining Class Weights
+# MAGIC 
+# MAGIC </br>
+# MAGIC 
+# MAGIC * In the previous notebook, we could observe the distribution of intents is varied, with a prevalence of questions around `life-insurance`.
+# MAGIC * This can be a challenge for our model to be able to generalize.
+# MAGIC * We can define different class weights, so that wrong predictions for a particular intent or topic are *penalized* differently depending on how frequent they are in our training set.
+# MAGIC * To achieve this, we will calculate *class weights* for the 12 intents in our dataset - the least frequent an intent is, the higher the penalty it will generate in case of wrong predictions.
 
 # COMMAND ----------
 
@@ -242,13 +222,18 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
-import transformers
 from transformers import pipeline
 import numpy as np
 
+model_output_dir = "/tmp/insuranceqa_model"
+pipeline_output_dir = "/tmp/insuranceqa_pipeline/artifacts"
+model_artifact_path = "model"
+
+mlflow.set_experiment(experiment_name = "/Shared/insuranceqa_distilbert")
+
 with mlflow.start_run() as run:
   trainer.train()
-  trainer.save_model(config["model_output_dir"])
+  trainer.save_model(model_output_dir)
   pipe = pipeline(
     "text-classification",
     model = model,
@@ -256,19 +241,19 @@ with mlflow.start_run() as run:
     batch_size = 8,
     tokenizer = tokenizer
   )
-  pipe.save_pretrained(config["pipeline_output_dir"])
+  pipe.save_pretrained(pipeline_output_dir)
 
-  # Log custom PyFunc model -- logging pip requirement versions
+  # Log custom PyFunc model
   mlflow.pyfunc.log_model(
     artifacts = {
-      "insuranceqa_pipeline": config["pipeline_output_dir"],
-      "base_model": config["model_output_dir"]
+      "insuranceqa_pipeline": pipeline_output_dir,
+      "base_model": model_output_dir
     },
-    artifact_path = config["model_artifact_path"],
+    artifact_path = model_artifact_path,
     python_model = InsuranceQAModel(),
     pip_requirements = [
-      f"""torch=={torch.__version__.split("+")[0]}""",
-      f"""transformers=={transformers.__version__}"""
+      "torch==1.13.1",
+      "transformers==4.26.1"
     ]
   )
 
@@ -305,29 +290,30 @@ loaded_model.predict(["my car broke, what should I do?"])
 
 # DBTITLE 1,Registering the model
 from mlflow.tracking import MlflowClient
-import pandas as pd
-from typing import List
 client = MlflowClient()
 
-# Register the model
-model_details = mlflow.register_model(logged_model_uri, model_name)
+model_name = "insuranceqa"
 
+def remove_existing_model(model_name: str):
+  """Archives all model versions for a particular model, and removes it from registry"""
 
-# Simple test
-def predict(questions: pd.Series) -> pd.Series:
-  """Wrapper function for the pipeline we created in the previous step."""
+  model_info = client.get_registered_model(model_name)
+  latest_versions = [int(model.version) for model in client.get_latest_versions(model_name)]
+  latest_version = max(latest_versions)
 
-  result = pipeline.predict(questions.to_list())
-  return pd.Series(result)
+  for version in range(0, latest_version):
+    model_version = client.get_model_version(model_name, version + 1)
+    current_stage = model_version.current_stage
+    if current_stage not in ["None", "Archived"]:
+      client.transition_model_version_stage(model_name, version = model_version.version, stage = "Archived")
+  
+  client.delete_registered_model(model_name)
 
-simple_df = pd.DataFrame(["hi I crashed my car"], columns = ["question_en"])
-test_prediction = predict(simple_df.question_en)
-test_prediction.values
+# IMPORTANT: Comment the line below if not testing
+remove_existing_model(model_name)
 
-# Transition the model to "Production" stage in the registry
-client.transition_model_version_stage(
-  name = config["model_name"],
-  version = model_details.version,
-  stage="Production",
-  archive_existing_versions=True
+# Register (or re-register) model
+mlflow.register_model(
+  model_uri = logged_model_uri,
+  name = model_name
 )
