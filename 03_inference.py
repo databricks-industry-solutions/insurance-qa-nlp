@@ -14,7 +14,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install datasets
+# MAGIC %pip install -q datasets
 
 # COMMAND ----------
 
@@ -26,29 +26,24 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 
-# ??????? explain why this is set
-spark.conf.set("spark.sql.adaptive.enabled", False)
-spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-
 # Read questions
 test_df = spark.sql("select question_en, topic_en from questions")
 
 # Increase parallelism to at least the number of worker cores in the cluster - if the data volume is larger, you can set this to multiples of the number of worker cores
 sc = spark._jsc.sc() 
-worker_count = len([executor.host() for executor in sc.statusTracker().getExecutorInfos() ]) -1
+worker_count = max(1, len([executor.host() for executor in sc.statusTracker().getExecutorInfos() ]) - 1) 
 total_worker_cores = spark.sparkContext.defaultParallelism * worker_count
 test_df = test_df.repartition(total_worker_cores)
 
 # COMMAND ----------
 
-# DBTITLE 1,Running inference on top of a Delta Table
-# Get model udf
-import pandas as pd
+# DBTITLE 1,Loading the model and generating test predictions
 from typing import List
+import pandas as pd
+from pyspark.sql import functions as F
+from mlflow.tracking import MlflowClient
 
-# Loading our production model and wrap it in a UDF
-prod_model_uri = f"""models:/{config["model_name"]}/production"""
-pipeline = mlflow.pyfunc.load_model(prod_model_uri)
+# Loading our model and wrapping it in a UDF
 
 def predict(questions: pd.Series) -> pd.Series:
   """Wrapper function for the pipeline we created in the previous step."""
@@ -66,7 +61,7 @@ test_df = (
 
 # COMMAND ----------
 
-# DBTITLE 1,Save prediction results into Delta
+# DBTITLE 1,Saving the predictions to Delta
 (
   test_df
     .write

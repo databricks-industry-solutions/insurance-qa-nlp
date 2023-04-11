@@ -47,7 +47,7 @@ pipe(["This restaurant is awesome", "This restaurant is awful"])
 
 # COMMAND ----------
 
-# MAGIC %pip install datasets
+# MAGIC %pip install -q datasets
 
 # COMMAND ----------
 
@@ -306,30 +306,28 @@ loaded_model.predict(["my car broke, what should I do?"])
 
 # DBTITLE 1,Registering the model
 from mlflow.tracking import MlflowClient
+import pandas as pd
+from typing import List
 client = MlflowClient()
 
-model_name = "insuranceqa"
+# Register the model
+model_details = mlflow.register_model(logged_model_uri, model_name)
 
-def remove_existing_model(model_name: str):
-  """Archives all model versions for a particular model, and removes it from registry"""
+# Simple test
 
-  model_info = client.get_registered_model(model_name)
-  latest_versions = [int(model.version) for model in client.get_latest_versions(model_name)]
-  latest_version = max(latest_versions)
+model_uri = f"""models:/{config["model_name"]}/latest"""
+pipeline = mlflow.pyfunc.load_model(model_uri = model_uri)
 
-  for version in range(0, latest_version):
-    model_version = client.get_model_version(model_name, version + 1)
-    current_stage = model_version.current_stage
-    if current_stage not in ["None", "Archived"]:
-      client.transition_model_version_stage(model_name, version = model_version.version, stage = "Archived")
-  
-  client.delete_registered_model(model_name)
+simple_df = pd.DataFrame(["hi I crashed my car"], columns = ["question_en"])
+test_prediction = pipeline.predict(simple_df.question_en)
+print(f"Prediction: {test_prediction}")
 
-# IMPORTANT: Comment the line below if not testing
-remove_existing_model(model_name)
+if test_prediction is not None:
 
-# Register (or re-register) model
-mlflow.register_model(
-  model_uri = logged_model_uri,
-  name = model_name
-)
+  # Transition the model to "Production" stage in the registry
+  client.transition_model_version_stage(
+    name = config["model_name"],
+    version = model_details.version,
+    stage="Production",
+    archive_existing_versions=True
+  )
