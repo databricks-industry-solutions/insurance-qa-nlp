@@ -59,7 +59,7 @@ import datasets
 
 local_path = "/tmp/insurance"
 dbutils.fs.rm(f"file://{local_path}", recurse = True)
-dbutils.fs.cp(config["main_path_w_dbfs"], f"file://{local_path}", recurse = True)
+dbutils.fs.cp(config["main_path"], f"file://{local_path}", recurse = True)
 dataset = datasets.load_from_disk(local_path)
 
 # COMMAND ----------
@@ -311,7 +311,7 @@ from typing import List
 client = MlflowClient()
 
 # Register the model
-model_details = mlflow.register_model(logged_model_uri, model_name)
+model_details = mlflow.register_model(logged_model_uri, config["model_name"])
 
 # Simple test
 
