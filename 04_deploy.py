@@ -23,13 +23,17 @@
 
 # COMMAND ----------
 
+# MAGIC %run ./config/notebook-config
+
+# COMMAND ----------
+
 import mlflow
 from mlflow.tracking import MlflowClient
 import requests
 import json
 
 client = MlflowClient()
-model_name = "insuranceqa"
+model_name = config["model_name"]
 endpoint_name = f"{model_name}_v2"
 model_info = client.get_latest_versions(name = model_name, stages = ["Production"])[0]
 

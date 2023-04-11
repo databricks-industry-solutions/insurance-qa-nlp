@@ -18,24 +18,37 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Getting the model's latest version
-import mlflow
-from mlflow.tracking import MlflowClient
-import torch
-
-client = MlflowClient()
-model_info = [
-  model for model in client.get_latest_versions(name = "insuranceqa")
-  if model.current_stage not in ["Archived", "Production"]
-][0]
-pipeline = mlflow.pyfunc.load_model(f"models:/{model_info.name}/{model_info.version}")
-model_info
+# MAGIC %run ./config/notebook-config
 
 # COMMAND ----------
 
-# DBTITLE 1,Defining a prediction function and running a simple test
+# DBTITLE 1,Reading in questions for inference
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType
+
+# ??????? explain why this is set
+spark.conf.set("spark.sql.adaptive.enabled", False)
+spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
+
+# Read questions
+test_df = spark.sql("select question_en, topic_en from questions")
+
+# Increase parallelism to at least the number of worker cores in the cluster - if the data volume is larger, you can set this to multiples of the number of worker cores
+sc = spark._jsc.sc() 
+worker_count = len([executor.host() for executor in sc.statusTracker().getExecutorInfos() ]) -1
+total_worker_cores = spark.sparkContext.defaultParallelism * worker_count
+test_df = test_df.repartition(total_worker_cores)
+
+# COMMAND ----------
+
+# DBTITLE 1,Running inference on top of a Delta Table
+# Get model udf
 import pandas as pd
 from typing import List
+
+# Loading our production model and wrap it in a UDF
+prod_model_uri = f"""models:/{config["model_name"]}/production"""
+pipeline = mlflow.pyfunc.load_model(prod_model_uri)
 
 def predict(questions: pd.Series) -> pd.Series:
   """Wrapper function for the pipeline we created in the previous step."""
@@ -43,48 +56,9 @@ def predict(questions: pd.Series) -> pd.Series:
   result = pipeline.predict(questions.to_list())
   return pd.Series(result)
 
-# Simple test
-simple_df = pd.DataFrame(["hi I crashed my car"], columns = ["question_en"])
-test_prediction = predict(simple_df.question_en)
-test_prediction.values
-
-# COMMAND ----------
-
-# DBTITLE 1,Promoting the model to production
-if test_prediction is not None:
-  # Prediction is valid, so we can transition our model version to Production stage
-  client.transition_model_version_stage(
-    name = model_info.name,
-    version = model_info.version,
-    stage = "Production",
-    archive_existing_versions = True
-  )
-
-# COMMAND ----------
-
-# DBTITLE 1,Running inference on top of a Delta Table
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType
-
-spark.conf.set("spark.sql.adaptive.enabled", False)
-spark.conf.set("spark.sql.adaptive.skewJoin.enabled", False)
-
-test_df = spark.sql("select question_en, topic_en from insuranceqa.questions")
-
-# Testing purposes, comment the line below for full data
-test_df = test_df.sample(0.3)
-test_df.count()
-
-test_df = test_df.cache()
-test_df.count()
-
-# Uncomment & increase number of partitions for higher degree of parallelism
-
-#test_df = test_df.repartition(4)
-#test_df.count()
-
 predict_udf = F.pandas_udf(predict, returnType = StringType())
 
+# Perform inference with the UDF
 test_df = (
   test_df
     .withColumn("predicted", predict_udf(F.col("question_en")))
@@ -97,13 +71,13 @@ test_df = (
   test_df
     .write
     .saveAsTable(
-      "insuranceqa.predictions",
+      "predictions",
       mode = "overwrite",
       mergeSchema = True
     )
 )
 
-predictions = spark.sql("select * from insuranceqa.predictions")
+predictions = spark.sql("select * from predictions")
 display(predictions)
 
 # COMMAND ----------
