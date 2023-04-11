@@ -88,10 +88,6 @@ display(dataset["train"].to_pandas().loc[:10, ["question_en", "topic_en"]])
 
 # COMMAND ----------
 
-!ls /tmp/insuranceqa
-
-# COMMAND ----------
-
 # DBTITLE 1,Basic Cleaning
 # Let's convert everything to lower case and remove extra spaces
 
