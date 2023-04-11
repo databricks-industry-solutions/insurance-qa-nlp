@@ -29,6 +29,10 @@
 
 # COMMAND ----------
 
+# MAGIC %run ./config/notebook-config
+
+# COMMAND ----------
+
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
@@ -79,9 +83,12 @@ import datasets
 
 # We cannot reload a dataset from the /dbfs path we saved it to. So we must copy it to a local file path
 # initialize the local path where we copy and reload the dataset 
-dbutils.fs.rm("file:/tmp/insurance", recurse = True) 
-dbutils.fs.cp("dbfs:/tmp/insurance", "file:/tmp/insurance", recurse = True)
-dataset = datasets.load_from_disk("/tmp/insurance")
+dbutils.fs.rm(config["main_local_path"], recurse = True) 
+dbutils.fs.cp(config["main_path"], config["main_local_path"], recurse = True)
+
+# get the path from `file:/....`
+local_path = config["main_local_path"].split(":")[-1]
+dataset = datasets.load_from_disk(local_path) 
 
 # COMMAND ----------
 
@@ -106,9 +113,6 @@ tokenized_dataset = dataset.map(tokenize, batched = True)
 
 # COMMAND ----------
 
-import datasets
-
-dataset = datasets.load_from_disk("/dbfs/tmp/insurance")
 label2id = dataset["train"].features["label"]._str2int
 id2label = dataset["train"].features["label"]._int2str
 
@@ -238,18 +242,13 @@ class InsuranceQAModel(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
+import transformers
 from transformers import pipeline
 import numpy as np
 
-model_output_dir = "/tmp/insuranceqa_model"
-pipeline_output_dir = "/tmp/insuranceqa_pipeline/artifacts"
-model_artifact_path = "model"
-
-mlflow.set_experiment(experiment_name = "/Shared/insuranceqa_distilbert")
-
 with mlflow.start_run() as run:
   trainer.train()
-  trainer.save_model(model_output_dir)
+  trainer.save_model(config["model_output_dir"])
   pipe = pipeline(
     "text-classification",
     model = model,
@@ -257,19 +256,19 @@ with mlflow.start_run() as run:
     batch_size = 8,
     tokenizer = tokenizer
   )
-  pipe.save_pretrained(pipeline_output_dir)
+  pipe.save_pretrained(config["pipeline_output_dir"])
 
-  # Log custom PyFunc model
+  # Log custom PyFunc model -- logging pip requirement versions
   mlflow.pyfunc.log_model(
     artifacts = {
-      "insuranceqa_pipeline": pipeline_output_dir,
-      "base_model": model_output_dir
+      "insuranceqa_pipeline": config["pipeline_output_dir"],
+      "base_model": config["model_output_dir"]
     },
-    artifact_path = model_artifact_path,
+    artifact_path = config["model_artifact_path"],
     python_model = InsuranceQAModel(),
     pip_requirements = [
-      "torch==1.13.1",
-      "transformers==4.26.1"
+      f"""torch=={torch.__version__.split("+")[0]}""",
+      f"""transformers=={transformers.__version__}"""
     ]
   )
 
@@ -306,9 +305,29 @@ loaded_model.predict(["my car broke, what should I do?"])
 
 # DBTITLE 1,Registering the model
 from mlflow.tracking import MlflowClient
+import pandas as pd
+from typing import List
 client = MlflowClient()
-
-model_name = "insuranceqa"
 
 # Register the model
 model_details = mlflow.register_model(logged_model_uri, model_name)
+
+
+# Simple test
+def predict(questions: pd.Series) -> pd.Series:
+  """Wrapper function for the pipeline we created in the previous step."""
+
+  result = pipeline.predict(questions.to_list())
+  return pd.Series(result)
+
+simple_df = pd.DataFrame(["hi I crashed my car"], columns = ["question_en"])
+test_prediction = predict(simple_df.question_en)
+test_prediction.values
+
+# Transition the model to "Production" stage in the registry
+client.transition_model_version_stage(
+  name = config["model_name"],
+  version = model_details.version,
+  stage="Production",
+  archive_existing_versions=True
+)

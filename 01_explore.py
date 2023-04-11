@@ -60,6 +60,10 @@
 
 # COMMAND ----------
 
+# MAGIC %run ./config/notebook-config
+
+# COMMAND ----------
+
 # DBTITLE 1,Downloading the Insurance QA Dataset
 from datasets import load_dataset
 
@@ -111,8 +115,8 @@ names = list(set(clean_dataset["train"]["label"]))
 clean_dataset = clean_dataset.cast_column("label", ClassLabel(names = names))
 
 # Save to cleaned dataset for further training
-dbutils.fs.rm("dbfs:/tmp/insurance", True)
-clean_dataset.save_to_disk("/dbfs/tmp/insurance") # You can write to dbfs locations via the /dbfs mount
+dbutils.fs.rm(config["main_path"], True)
+clean_dataset.save_to_disk(config["main_path_w_dbfs"]) # You can write to the same dbfs locations via the /dbfs mount as if it is a local path
 
 # COMMAND ----------
 
@@ -144,8 +148,7 @@ display(dataset["train"].to_pandas())
 
 # DBTITLE 1,Saving the test set into Delta for inference
 test_df = spark.createDataFrame(dataset["test"].to_pandas())
-spark.sql("create database if not exists insuranceqa")
-test_df.write.saveAsTable("insuranceqa.questions", mode = "overwrite")
+test_df.write.saveAsTable("questions", mode = "overwrite")
 
 # COMMAND ----------
 
