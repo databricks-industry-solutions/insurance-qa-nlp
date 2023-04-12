@@ -19,10 +19,15 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install datasets
+# MAGIC %pip install -q datasets
 
 # COMMAND ----------
 
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Setup config
 # MAGIC %run ./config/notebook-config
 
 # COMMAND ----------
@@ -92,7 +97,11 @@ def create_endpoint(endpoint_name: str, model_name: str, model_version: int) -> 
 
   return response
 
-create_endpoint(endpoint_name = endpoint_name, model_name = model_info.name, model_version = model_info.version)
+create_endpoint(
+  endpoint_name = endpoint_name,
+  model_name = model_info.name,
+  model_version = model_info.version
+)
 
 # COMMAND ----------
 
@@ -100,7 +109,8 @@ create_endpoint(endpoint_name = endpoint_name, model_name = model_info.name, mod
 import time
 from IPython.display import clear_output
 
-def check_endpoint_status(endpoint_name: str, max_retries: int = 1000, interval: int = 5):
+def check_endpoint_status(endpoint_name: str, max_retries: int = 1000, interval: int = 5) -> str:
+  """Check the Model Serving deployment status at every time step defined with the interval parameters"""
 
   current_tries = 0
 
@@ -116,11 +126,13 @@ def check_endpoint_status(endpoint_name: str, max_retries: int = 1000, interval:
       if endpoint["name"] == endpoint_name
     ][0]
     current_state = endpoint_status["state"]["config_update"]
+
     if (current_state == "IN_PROGRESS"):
       print(f"Checking model deployment status, attempt {current_tries} of {max_retries} - current state: {current_state}")
     else:
-      print(f"Model endpoint deployment result: {endpoint_status}")
-      break
+      message = f"Model endpoint deployment result: {endpoint_status}"
+      return message
+
     current_tries += 1
     time.sleep(interval)
 
@@ -129,7 +141,6 @@ check_endpoint_status(endpoint_name = endpoint_name)
 # COMMAND ----------
 
 # DBTITLE 1,Querying the endpoint through REST API
-
 def test_prediction_endpoint(questions):
   endpoint_url = f"serving-endpoints/{endpoint_name}/invocations"
   payload = {"instances": questions}
@@ -147,4 +158,9 @@ def test_prediction_endpoint(questions):
     raise Exception(f'Request failed with status {response.status_code}, {response.text}')
   return response.json()
 
-test_prediction_endpoint(["what is my life insurance coverage?"])
+test_questions = [
+  "my car broke, what should I do?",
+  "what is my life insurance coverage?",
+  "can you send me my health insurance cover?"
+]
+test_prediction_endpoint(test_questions)

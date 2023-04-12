@@ -18,6 +18,11 @@
 
 # COMMAND ----------
 
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Setup configs
 # MAGIC %run ./config/notebook-config
 
 # COMMAND ----------
@@ -42,8 +47,10 @@ from typing import List
 import pandas as pd
 from pyspark.sql import functions as F
 from mlflow.tracking import MlflowClient
+import mlflow
 
 # Loading our model and wrapping it in a UDF
+pipeline = mlflow.pyfunc.load_model(f"models:/{config['model_name']}/production")
 
 def predict(questions: pd.Series) -> pd.Series:
   """Wrapper function for the pipeline we created in the previous step."""

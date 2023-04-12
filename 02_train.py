@@ -14,6 +14,18 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install -q datasets
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# MAGIC %run ./config/notebook-config
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Distilbert Example
@@ -44,14 +56,6 @@ pipe(["This restaurant is awesome", "This restaurant is awful"])
 # MAGIC %md
 # MAGIC 
 # MAGIC ## Reading the dataset
-
-# COMMAND ----------
-
-# MAGIC %pip install -q datasets
-
-# COMMAND ----------
-
-# MAGIC %run ./config/notebook-config
 
 # COMMAND ----------
 

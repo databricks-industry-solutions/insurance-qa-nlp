@@ -115,6 +115,7 @@ names = list(set(clean_dataset["train"]["label"]))
 clean_dataset = clean_dataset.cast_column("label", ClassLabel(names = names))
 
 # Save to cleaned dataset for further training
+## We first save the clean dataset to a local path in the driver, then copy it to DBFS because pyarrow is unable to write directly to DBFS
 local_path = "/tmp/insuranceqa"
 dbutils.fs.rm(config["main_path"], True)
 clean_dataset.save_to_disk(local_path)
@@ -145,6 +146,14 @@ display(dataset["train"].to_pandas())
 # MAGIC 
 # MAGIC * Looking at the distribution of topics/intents across our training set, we can see that apart from life insurance, auto insurance and medicare are quite popular themes.
 # MAGIC * When we look at the opposite direction - less popular intents, we can highlight *critical illness insurance*, *long term care insurance* and *other insurance*. Here, we might also be interested in understanding more about these specific liness of businesses, and even compare profit margins across them. The fact that there are few questions around these topics could also mean that we are doing a better job at enabling customers to solve their problems or answer their questions through digital channels, without having to talk to a human agent.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC Here we create the table by converting a HuggingFace dataset to Pandas, then to write as a Delta table. This may have scalability contraints as the dataset cannot be larger than your driver memory.
+# MAGIC 
+# MAGIC In more realistic scenarios, your data may already come in formats that Spark can process in parallelized ways. 
 
 # COMMAND ----------
 
